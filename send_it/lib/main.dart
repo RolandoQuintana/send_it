@@ -3,6 +3,11 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
+import 'models/message_group.dart';
+import 'screens/create_group_screen.dart';
+import 'screens/group_message_screen.dart';
+import 'services/group_storage.dart';
+import 'screens/group_message_screen.dart';
 
 void main() {
   runApp(const SendItApp());
@@ -41,13 +46,13 @@ class _HomePageState extends State<HomePage> {
   bool isComposing = false;
   Contact? currentContact;
   static const platform = MethodChannel('com.sendit/messages');
+  List<MessageGroup> groups = [];
 
   @override
   void initState() {
     super.initState();
     _requestContactsPermission();
     _searchController.addListener(_filterContacts);
-    _testMethodChannel();
   }
 
   void _filterContacts() {
@@ -62,7 +67,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _requestContactsPermission() async {
     final granted = await FlutterContacts.requestPermission();
     if (granted) {
-      _loadContacts();
+      await _loadContacts();
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -84,6 +89,7 @@ class _HomePageState extends State<HomePage> {
         filteredContacts = contacts;
         isLoading = false;
       });
+      await _loadGroups();
     } catch (e) {
       setState(() => isLoading = false);
       if (mounted) {
@@ -92,6 +98,56 @@ class _HomePageState extends State<HomePage> {
         );
       }
     }
+  }
+
+  Future<void> _loadGroups() async {
+    try {
+      final loadedGroups = await GroupStorage.loadGroups(allContacts);
+      setState(() {
+        groups = loadedGroups;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading groups: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _createNewGroup() async {
+    final group = await Navigator.push<MessageGroup>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateGroupScreen(
+          allContacts: allContacts,
+          onGroupCreated: (group) async {
+            await GroupStorage.addGroup(group);
+            await _loadGroups();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _openGroup(MessageGroup group) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GroupMessageScreen(
+          group: group,
+          allContacts: allContacts,
+          onGroupUpdated: (updatedGroup) async {
+            await GroupStorage.updateGroup(updatedGroup);
+            await _loadGroups();
+          },
+          onGroupDeleted: (groupId) async {
+            await GroupStorage.deleteGroup(groupId);
+            await _loadGroups();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _sendMessages() async {
@@ -160,75 +216,35 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: const Text('Send It'),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search contacts...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-              ),
-            ),
-          ),
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                    itemCount: filteredContacts.length,
-                    itemBuilder: (context, index) {
-                      final contact = filteredContacts[index];
-                      final isSelected = selectedContacts.contains(contact);
-                      return ListTile(
-                        leading: CircleAvatar(
-                          child: Text(contact.displayName[0]),
-                        ),
-                        title: Text(contact.displayName),
-                        trailing: IconButton(
-                          icon: Icon(
-                            isSelected ? Icons.check_circle : Icons.circle_outlined,
-                            color: isSelected ? Colors.blue : null,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              if (isSelected) {
-                                selectedContacts.remove(contact);
-                              } else {
-                                selectedContacts.add(contact);
-                              }
-                            });
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                Expanded(
+                  child: groups.isEmpty
+                      ? const Center(
+                          child: Text('No groups yet. Create one to get started!'),
+                        )
+                      : ListView.builder(
+                          itemCount: groups.length,
+                          itemBuilder: (context, index) {
+                            final group = groups[index];
+                            return ListTile(
+                              leading: CircleAvatar(
+                                child: Text(group.name[0]),
+                              ),
+                              title: Text(group.name),
+                              subtitle: Text('${group.members.length} members'),
+                              onTap: () => _openGroup(group),
+                            );
                           },
                         ),
-                      );
-                    },
-                  ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _messageController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter your message',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: _sendMessages,
-                  child: const Text('Send Messages'),
                 ),
               ],
             ),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: _createNewGroup,
+        child: const Icon(Icons.group_add),
       ),
     );
   }

@@ -26,6 +26,13 @@ class GroupMessageScreen extends StatefulWidget {
 class _GroupMessageScreenState extends State<GroupMessageScreen> {
   final TextEditingController _messageController = TextEditingController();
   static const platform = MethodChannel('com.sendit/messages');
+  late List<Contact> selectedContacts;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedContacts = List.from(widget.group.members);
+  }
 
   Future<void> _sendMessages() async {
     if (_messageController.text.isEmpty) {
@@ -35,7 +42,14 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
       return;
     }
 
-    for (final contact in widget.group.members) {
+    if (selectedContacts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one recipient')),
+      );
+      return;
+    }
+
+    for (final contact in selectedContacts) {
       final phoneNumber = contact.phones.firstOrNull?.number;
       if (phoneNumber == null) continue;
 
@@ -54,7 +68,33 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
           // Message was sent successfully, continue to next contact
           continue;
         } else if (result == "cancelled") {
-          // User cancelled, skip this contact
+          // User cancelled, ask if they want to continue with remaining messages
+          final remainingCount = selectedContacts.length - selectedContacts.indexOf(contact) - 1;
+          if (remainingCount > 0) {
+            final shouldContinue = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Message Cancelled'),
+                content: Text('Do you want to continue sending to the remaining $remainingCount recipients?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Stop'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Continue'),
+                  ),
+                ],
+              ),
+            );
+
+            if (shouldContinue != true) {
+              // User chose to stop sending
+              break;
+            }
+          }
+          // If user chose to continue or there are no more recipients, continue to next contact
           continue;
         }
       } on PlatformException catch (e) {
@@ -82,6 +122,8 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
       setState(() {
         widget.group.members.clear();
         widget.group.members.addAll(updatedGroup.members);
+        // Update selected contacts to match the new group members
+        selectedContacts = List.from(updatedGroup.members);
       });
     }
   }
@@ -137,12 +179,25 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
               itemCount: widget.group.members.length,
               itemBuilder: (context, index) {
                 final contact = widget.group.members[index];
+                final isSelected = selectedContacts.contains(contact);
                 return ListTile(
                   leading: CircleAvatar(
                     child: Text(contact.displayName[0]),
                   ),
                   title: Text(contact.displayName),
                   subtitle: Text(contact.phones.firstOrNull?.number ?? 'No phone number'),
+                  trailing: Checkbox(
+                    value: isSelected,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        if (value == true) {
+                          selectedContacts.add(contact);
+                        } else {
+                          selectedContacts.remove(contact);
+                        }
+                      });
+                    },
+                  ),
                 );
               },
             ),
@@ -162,7 +217,7 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
                 const SizedBox(height: 8),
                 ElevatedButton(
                   onPressed: _sendMessages,
-                  child: const Text('Send to Group'),
+                  child: Text('Send to ${selectedContacts.length} Recipients'),
                 ),
               ],
             ),

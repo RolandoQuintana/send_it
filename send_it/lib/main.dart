@@ -19,7 +19,7 @@ class SendItApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CupertinoApp(
-      title: 'Send It',
+      title: 'Sent It',
       theme: const CupertinoThemeData(
         primaryColor: CupertinoColors.systemBlue,
         brightness: Brightness.dark,

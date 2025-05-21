@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import '../models/message_group.dart';
@@ -45,15 +46,35 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
 
   Future<void> _saveChanges() async {
     if (_nameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a group name')),
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Error'),
+          content: const Text('Please enter a group name'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
       );
       return;
     }
 
     if (selectedContacts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one contact')),
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Error'),
+          content: const Text('Please select at least one contact'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
       );
       return;
     }
@@ -74,73 +95,69 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit Group'),
-        actions: [
-          TextButton(
-            onPressed: _saveChanges,
-            child: const Text('Save'),
-          ),
-        ],
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('Edit Group'),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Text('Save'),
+          onPressed: _saveChanges,
+        ),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Group Name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search contacts...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: CupertinoTextField(
+                controller: _nameController,
+                placeholder: 'Group Name',
+                decoration: BoxDecoration(
+                  border: Border.all(color: CupertinoColors.systemGrey4),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
             ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: filteredContacts.length,
-              itemBuilder: (context, index) {
-                final contact = filteredContacts[index];
-                final isSelected = selectedContacts.contains(contact);
-                return ListTile(
-                  leading: CircleAvatar(
-                    child: Text(contact.displayName[0]),
-                  ),
-                  title: Text(contact.displayName),
-                  trailing: IconButton(
-                    icon: Icon(
-                      isSelected ? Icons.check_circle : Icons.circle_outlined,
-                      color: isSelected ? Colors.blue : null,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        if (isSelected) {
-                          selectedContacts.remove(contact);
-                        } else {
-                          selectedContacts.add(contact);
-                        }
-                      });
-                    },
-                  ),
-                );
-              },
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: CupertinoSearchTextField(
+                controller: _searchController,
+                placeholder: 'Search contacts...',
+              ),
             ),
-          ),
-        ],
+            Expanded(
+              child: ListView.builder(
+                itemCount: filteredContacts.length,
+                itemBuilder: (context, index) {
+                  final contact = filteredContacts[index];
+                  final isSelected = selectedContacts.contains(contact);
+                  return CupertinoListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: CupertinoColors.systemBlue,
+                      child: Text(
+                        contact.displayName[0],
+                        style: const TextStyle(color: CupertinoColors.white),
+                      ),
+                    ),
+                    title: Text(contact.displayName),
+                    trailing: CupertinoSwitch(
+                      value: isSelected,
+                      onChanged: (bool value) {
+                        setState(() {
+                          if (value) {
+                            selectedContacts.add(contact);
+                          } else {
+                            selectedContacts.remove(contact);
+                          }
+                        });
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

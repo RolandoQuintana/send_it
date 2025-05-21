@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -7,7 +8,6 @@ import 'models/message_group.dart';
 import 'screens/create_group_screen.dart';
 import 'screens/group_message_screen.dart';
 import 'services/group_storage.dart';
-import 'screens/group_message_screen.dart';
 
 void main() {
   runApp(const SendItApp());
@@ -18,11 +18,15 @@ class SendItApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return CupertinoApp(
       title: 'Send It',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
+      theme: const CupertinoThemeData(
+        primaryColor: CupertinoColors.systemBlue,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: CupertinoColors.black,
+        textTheme: CupertinoTextThemeData(
+          textStyle: TextStyle(color: CupertinoColors.white),
+        ),
       ),
       home: const HomePage(),
     );
@@ -70,8 +74,18 @@ class _HomePageState extends State<HomePage> {
       await _loadContacts();
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Contacts permission is required')),
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('Permission Required'),
+            content: const Text('Contacts permission is required to use this app.'),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
         );
       }
     }
@@ -93,8 +107,18 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       setState(() => isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading contacts: $e')),
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('Error'),
+            content: Text('Error loading contacts: $e'),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
         );
       }
     }
@@ -108,8 +132,18 @@ class _HomePageState extends State<HomePage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading groups: $e')),
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('Error'),
+            content: Text('Error loading groups: $e'),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
         );
       }
     }
@@ -118,7 +152,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _createNewGroup() async {
     final group = await Navigator.push<MessageGroup>(
       context,
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (context) => CreateGroupScreen(
           allContacts: allContacts,
           onGroupCreated: (group) async {
@@ -133,7 +167,7 @@ class _HomePageState extends State<HomePage> {
   void _openGroup(MessageGroup group) {
     Navigator.push(
       context,
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (context) => GroupMessageScreen(
           group: group,
           allContacts: allContacts,
@@ -150,101 +184,95 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> _sendMessages() async {
-    if (selectedContacts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one contact')),
-      );
-      return;
-    }
-
-    if (_messageController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a message')),
-      );
-      return;
-    }
-
-    for (final contact in selectedContacts) {
-      final phoneNumber = contact.phones.firstOrNull?.number;
-      if (phoneNumber == null) continue;
-
-      // Clean up phone number format
-      final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
-
-      print('Sending message to: ${contact.displayName}');
-      print('Phone number: $cleanNumber');
-      print('Message: ${_messageController.text}');
-
-      try {
-        final args = {
-          'recipient': cleanNumber,
-          'message': _messageController.text,
-        };
-        print('Arguments: $args');
-
-        final result = await platform.invokeMethod('sendMessage', args);
-
-        if (result == "sent") {
-          // Message was sent successfully, continue to next contact
-          continue;
-        } else if (result == "cancelled") {
-          // User cancelled, skip this contact
-          continue;
-        }
-      } on PlatformException catch (e) {
-        print('Platform Exception: ${e.code} - ${e.message}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.message}')),
-        );
-      }
-    }
-  }
-
-  Future<void> _testMethodChannel() async {
-    try {
-      await platform.invokeMethod('test');
-      print('Method channel is working');
-    } catch (e) {
-      print('Method channel error: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Send It'),
+    return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('Send It'),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Expanded(
-                  child: groups.isEmpty
-                      ? const Center(
-                          child: Text('No groups yet. Create one to get started!'),
-                        )
-                      : ListView.builder(
-                          itemCount: groups.length,
-                          itemBuilder: (context, index) {
-                            final group = groups[index];
-                            return ListTile(
-                              leading: CircleAvatar(
-                                child: Text(group.name[0]),
+      child: SafeArea(
+        child: Stack(
+          children: [
+            isLoading
+                ? const Center(child: CupertinoActivityIndicator())
+                : groups.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'No groups yet',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
                               ),
-                              title: Text(group.name),
-                              subtitle: Text('${group.members.length} members'),
-                              onTap: () => _openGroup(group),
-                            );
-                          },
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Create one to get started!',
+                              style: TextStyle(
+                                color: CupertinoColors.systemGrey,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            CupertinoButton.filled(
+                              onPressed: _createNewGroup,
+                              child: const Text('Create Group'),
+                            ),
+                          ],
                         ),
+                      )
+                    : ListView.builder(
+                        itemCount: groups.length,
+                        itemBuilder: (context, index) {
+                          final group = groups[index];
+                          return CupertinoListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: CupertinoColors.systemBlue,
+                              child: Text(
+                                group.name[0],
+                                style: const TextStyle(color: CupertinoColors.white),
+                              ),
+                            ),
+                            title: Text(group.name),
+                            subtitle: Text('${group.members.length} members'),
+                            trailing: const CupertinoListTileChevron(),
+                            onTap: () => _openGroup(group),
+                          );
+                        },
+                      ),
+            if (groups.isNotEmpty)
+              Positioned(
+                right: 16,
+                bottom: 16,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.systemBlue,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: CupertinoColors.systemGrey.withOpacity(0.3),
+                          spreadRadius: 1,
+                          blurRadius: 3,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      CupertinoIcons.add,
+                      color: CupertinoColors.white,
+                      size: 30,
+                    ),
+                  ),
+                  onPressed: _createNewGroup,
                 ),
-              ],
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createNewGroup,
-        child: const Icon(Icons.group_add),
+              ),
+          ],
+        ),
       ),
     );
   }

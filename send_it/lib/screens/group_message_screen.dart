@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
@@ -36,15 +37,35 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
 
   Future<void> _sendMessages() async {
     if (_messageController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a message')),
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Error'),
+          content: const Text('Please enter a message'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
       );
       return;
     }
 
     if (selectedContacts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one recipient')),
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Error'),
+          content: const Text('Please select at least one recipient'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
       );
       return;
     }
@@ -71,17 +92,18 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
           // User cancelled, ask if they want to continue with remaining messages
           final remainingCount = selectedContacts.length - selectedContacts.indexOf(contact) - 1;
           if (remainingCount > 0) {
-            final shouldContinue = await showDialog<bool>(
+            final shouldContinue = await showCupertinoDialog<bool>(
               context: context,
-              builder: (context) => AlertDialog(
+              builder: (context) => CupertinoAlertDialog(
                 title: const Text('Message Cancelled'),
                 content: Text('Do you want to continue sending to the remaining $remainingCount recipients?'),
                 actions: [
-                  TextButton(
+                  CupertinoDialogAction(
+                    isDestructiveAction: true,
                     onPressed: () => Navigator.pop(context, false),
                     child: const Text('Stop'),
                   ),
-                  TextButton(
+                  CupertinoDialogAction(
                     onPressed: () => Navigator.pop(context, true),
                     child: const Text('Continue'),
                   ),
@@ -99,8 +121,18 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
         }
       } on PlatformException catch (e) {
         print('Platform Exception: ${e.code} - ${e.message}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.message}')),
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('Error'),
+            content: Text('Error: ${e.message}'),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
         );
       }
     }
@@ -109,7 +141,7 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
   Future<void> _editGroup() async {
     final updatedGroup = await Navigator.push<MessageGroup>(
       context,
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (context) => EditGroupScreen(
           group: widget.group,
           allContacts: widget.allContacts,
@@ -129,17 +161,18 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
   }
 
   Future<void> _deleteGroup() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showCupertinoDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => CupertinoAlertDialog(
         title: const Text('Delete Group'),
         content: const Text('Are you sure you want to delete this group?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
+          CupertinoDialogAction(
             child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
           ),
-          TextButton(
+          CupertinoDialogAction(
+            isDestructiveAction: true,
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),
@@ -158,71 +191,92 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.group.name),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: _editGroup,
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: _deleteGroup,
-          ),
-        ],
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(widget.group.name),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: const Icon(CupertinoIcons.pencil),
+              onPressed: _editGroup,
+            ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: const Icon(CupertinoIcons.delete),
+              onPressed: _deleteGroup,
+            ),
+          ],
+        ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: widget.group.members.length,
-              itemBuilder: (context, index) {
-                final contact = widget.group.members[index];
-                final isSelected = selectedContacts.contains(contact);
-                return ListTile(
-                  leading: CircleAvatar(
-                    child: Text(contact.displayName[0]),
-                  ),
-                  title: Text(contact.displayName),
-                  subtitle: Text(contact.phones.firstOrNull?.number ?? 'No phone number'),
-                  trailing: Checkbox(
-                    value: isSelected,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        if (value == true) {
-                          selectedContacts.add(contact);
-                        } else {
-                          selectedContacts.remove(contact);
-                        }
-                      });
-                    },
-                  ),
-                );
-              },
+      child: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                itemCount: widget.group.members.length,
+                itemBuilder: (context, index) {
+                  final contact = widget.group.members[index];
+                  final isSelected = selectedContacts.contains(contact);
+                  return CupertinoListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: CupertinoColors.systemBlue,
+                      child: Text(
+                        contact.displayName[0],
+                        style: const TextStyle(color: CupertinoColors.white),
+                      ),
+                    ),
+                    title: Text(contact.displayName),
+                    subtitle: Text(contact.phones.firstOrNull?.number ?? 'No phone number'),
+                    trailing: CupertinoSwitch(
+                      value: isSelected,
+                      onChanged: (bool value) {
+                        setState(() {
+                          if (value) {
+                            selectedContacts.add(contact);
+                          } else {
+                            selectedContacts.remove(contact);
+                          }
+                        });
+                      },
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _messageController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter your message',
-                    border: OutlineInputBorder(),
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              decoration: BoxDecoration(
+                color: CupertinoColors.black,
+                border: Border(
+                  top: BorderSide(
+                    color: CupertinoColors.systemGrey4,
+                    width: 0.5,
                   ),
-                  maxLines: 3,
                 ),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: _sendMessages,
-                  child: Text('Send to ${selectedContacts.length} Recipients'),
-                ),
-              ],
+              ),
+              child: Column(
+                children: [
+                  CupertinoTextField(
+                    controller: _messageController,
+                    placeholder: 'Enter your message',
+                    maxLines: 3,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: CupertinoColors.systemGrey4),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  CupertinoButton.filled(
+                    onPressed: _sendMessages,
+                    child: Text('Send to ${selectedContacts.length} Recipients'),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

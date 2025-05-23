@@ -21,7 +21,7 @@ class SendItApp extends StatelessWidget {
     return CupertinoApp(
       title: 'Sent It',
       theme: const CupertinoThemeData(
-        primaryColor: CupertinoColors.systemBlue,
+        primaryColor: Color(0xFF0fa0ab),
         brightness: Brightness.dark,
         scaffoldBackgroundColor: CupertinoColors.black,
         textTheme: CupertinoTextThemeData(
@@ -29,6 +29,7 @@ class SendItApp extends StatelessWidget {
         ),
       ),
       home: const HomePage(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -228,7 +229,7 @@ class _HomePageState extends State<HomePage> {
                           final group = groups[index];
                           return CupertinoListTile(
                             leading: CircleAvatar(
-                              backgroundColor: CupertinoColors.systemBlue,
+                              backgroundColor: const Color(0xFF0fa0ab),
                               child: Text(
                                 group.name[0],
                                 style: const TextStyle(color: CupertinoColors.white),
@@ -251,7 +252,7 @@ class _HomePageState extends State<HomePage> {
                     width: 60,
                     height: 60,
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemBlue,
+                      color: const Color(0xFF0fa0ab),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(

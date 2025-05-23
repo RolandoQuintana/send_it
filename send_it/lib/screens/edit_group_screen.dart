@@ -133,7 +133,7 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
                   final isSelected = selectedContacts.contains(contact);
                   return CupertinoListTile(
                     leading: CircleAvatar(
-                      backgroundColor: CupertinoColors.systemBlue,
+                      backgroundColor: const Color(0xFF0fa0ab),
                       child: Text(
                         contact.displayName[0],
                         style: const TextStyle(color: CupertinoColors.white),

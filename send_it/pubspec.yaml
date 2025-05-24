@@ -38,6 +38,8 @@ dependencies:
   url_launcher: ^6.2.2
   permission_handler: ^11.1.0
   shared_preferences: ^2.2.2
+  image_picker: ^1.0.7
+  path_provider: ^2.1.2
 
 dev_dependencies:
   flutter_test:

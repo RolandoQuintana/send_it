@@ -32,6 +32,8 @@
 	<true/>
 	<key>NSContactsUsageDescription</key>
 	<string>This app needs access to contacts to let you select recipients for your messages.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to photos to let you attach images to your messages.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

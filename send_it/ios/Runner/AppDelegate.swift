@@ -1,6 +1,9 @@
 import Flutter
 import UIKit
 import MessageUI
+import Photos
+import UniformTypeIdentifiers
+import MobileCoreServices
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, MFMessageComposeViewControllerDelegate {
@@ -21,11 +24,6 @@ import MessageUI
         print("Received method call: sendMessage")
         print("Raw arguments: \(String(describing: call.arguments))")
         print("Arguments type: \(type(of: call.arguments))")
-
-        // Try to force cast first to see what we're getting
-        if let rawArgs = call.arguments {
-            print("Raw args type: \(type(of: rawArgs))")
-        }
 
         guard let args = call.arguments as? [String: Any] else {
             print("Failed to cast arguments to dictionary. Type: \(type(of: call.arguments))")
@@ -50,14 +48,57 @@ import MessageUI
             return
         }
 
+        let mediaPaths = args["mediaPaths"] as? [String]
+
         print("Recipient: \(recipient)")
         print("Message: \(message)")
+        print("Media Paths: \(String(describing: mediaPaths))")
 
         if MFMessageComposeViewController.canSendText() {
           let messageVC = MFMessageComposeViewController()
           messageVC.messageComposeDelegate = self
           messageVC.recipients = [recipient]
           messageVC.body = message
+
+          // Add media attachments if provided
+          if let mediaPaths = mediaPaths {
+              for mediaPath in mediaPaths {
+                  let mediaURL = URL(fileURLWithPath: mediaPath)
+                  if FileManager.default.fileExists(atPath: mediaPath) {
+                      do {
+                          let mediaData = try Data(contentsOf: mediaURL)
+                          let pathExtension = mediaURL.pathExtension.lowercased()
+
+                          // Create a temporary file with the correct extension
+                          let tempDir = FileManager.default.temporaryDirectory
+                          let tempFile = tempDir.appendingPathComponent(UUID().uuidString + "." + pathExtension)
+                          try mediaData.write(to: tempFile)
+
+                          // Get the UTI for the file
+                          var typeIdentifier: String?
+                          if let uti = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, pathExtension as CFString, nil)?.takeRetainedValue() {
+                              typeIdentifier = uti as String
+                          }
+
+                          if let typeIdentifier = typeIdentifier {
+                              messageVC.addAttachmentURL(tempFile, withAlternateFilename: mediaURL.lastPathComponent)
+                          } else {
+                              print("Could not determine UTI for file: \(mediaPath)")
+                              result(FlutterError(code: "MEDIA_TYPE_ERROR", message: "Could not determine media type", details: nil))
+                              return
+                          }
+                      } catch {
+                          print("Error attaching media: \(error)")
+                          result(FlutterError(code: "MEDIA_ATTACHMENT_ERROR", message: "Failed to attach media: \(error.localizedDescription)", details: nil))
+                          return
+                      }
+                  } else {
+                      print("Media file not found at path: \(mediaPath)")
+                      result(FlutterError(code: "MEDIA_NOT_FOUND", message: "Media file not found", details: nil))
+                      return
+                  }
+              }
+          }
 
           // Store the result to be called later
           self.pendingResult = result

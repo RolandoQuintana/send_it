@@ -7,6 +7,7 @@ import 'dart:io';
 import '../models/message_group.dart';
 import '../services/group_storage.dart';
 import '../services/keyboard_height_storage.dart';
+import '../services/shortcut_service.dart';
 import 'edit_group_screen.dart';
 
 class GroupMessageScreen extends StatefulWidget {
@@ -268,6 +269,90 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
     }
   }
 
+  Future<void> _sendViaShortcut() async {
+    if (_messageController.text.trim().isEmpty) {
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('No Message'),
+          content: const Text('Please enter a message before sending via Shortcut.'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (selectedContacts.isEmpty) {
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('No Recipients'),
+          content: const Text('Please select at least one contact.'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    setState(() => _showActionButtons = false);
+
+    final result = await ShortcutService.sendViaShortcut(
+      contacts: selectedContacts,
+      messageTemplate: _messageController.text,
+    );
+
+    if (!mounted) return;
+
+    switch (result) {
+      case ShortcutLaunchResult.launched:
+        setState(() {
+          _messageController.clear();
+          _selectedMedia.clear();
+        });
+      case ShortcutLaunchResult.notInstalled:
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('Shortcut Not Found'),
+            content: const Text(
+              'The "Send It Blast" shortcut isn\'t installed yet. '
+              'Go to More → Install Shortcut to set it up.',
+            ),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      case ShortcutLaunchResult.noValidContacts:
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('No Valid Numbers'),
+            content: const Text('None of the selected contacts have a valid phone number.'),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+    }
+  }
+
   Future<void> _editGroup() async {
     final updatedGroup = await Navigator.push<MessageGroup>(
       context,
@@ -405,6 +490,14 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
                   _showVariablesList = true;
                 });
               },
+            ),
+            const SizedBox(width: 16),
+            _buildActionButton(
+              icon: CupertinoIcons.bolt_fill,
+              label: 'Shortcut',
+              onTap: _selectedMedia.isNotEmpty ? null : _sendViaShortcut,
+              disabled: _selectedMedia.isNotEmpty,
+              disabledReason: 'Remove media\nto use',
             ),
           ],
         ),
@@ -560,10 +653,16 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
   Widget _buildActionButton({
     required IconData icon,
     required String label,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
+    bool disabled = false,
+    String? disabledReason,
   }) {
+    final iconColor = disabled
+        ? CupertinoColors.systemGrey
+        : const Color(0xFF0fa0ab);
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: disabled ? null : onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -574,18 +673,14 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
               color: CupertinoColors.systemGrey6,
               borderRadius: BorderRadius.circular(30),
             ),
-            child: Icon(
-              icon,
-              color: const Color(0xFF0fa0ab),
-              size: 24,
-            ),
+            child: Icon(icon, color: iconColor, size: 24),
           ),
           const SizedBox(height: 8),
           Text(
-            label,
-            style: const TextStyle(
-              color: CupertinoColors.white,
-              fontSize: 12,
+            disabled && disabledReason != null ? disabledReason : label,
+            style: TextStyle(
+              color: disabled ? CupertinoColors.systemGrey : CupertinoColors.white,
+              fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,

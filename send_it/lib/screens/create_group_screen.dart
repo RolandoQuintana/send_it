@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import '../models/message_group.dart';
+import '../services/contact_search_service.dart';
+import '../services/keyboard_height_storage.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   final List<Contact> allContacts;
@@ -22,6 +24,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<Contact> selectedContacts = [];
   List<Contact> filteredContacts = [];
+  bool searchName = true;
+  bool searchCompany = true;
+  double? keyboardHeight;
 
   @override
   void initState() {
@@ -31,12 +36,36 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   }
 
   void _filterContacts() {
-    final query = _searchController.text.toLowerCase();
+    final query = _searchController.text;
     setState(() {
-      filteredContacts = widget.allContacts.where((contact) {
-        return contact.displayName.toLowerCase().contains(query);
-      }).toList();
+      filteredContacts = ContactSearchService.searchContacts(
+        widget.allContacts,
+        query,
+        searchName: searchName,
+        searchCompany: searchCompany,
+      );
     });
+  }
+
+  void _captureKeyboardHeight() {
+    final currentKeyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    if (currentKeyboardHeight > 0) {
+      // Update if this is the first capture or if it's larger than what we have
+      if (keyboardHeight == null || currentKeyboardHeight > keyboardHeight!) {
+        setState(() {
+          keyboardHeight = currentKeyboardHeight;
+        });
+        // Store globally for use elsewhere in the app
+        _storeKeyboardHeightGlobally(currentKeyboardHeight);
+        print('Keyboard height updated: ${currentKeyboardHeight}px (max so far)');
+      }
+    }
+  }
+
+  void _storeKeyboardHeightGlobally(double height) {
+    // You can store this in SharedPreferences, a global variable, or pass it back to parent
+    // For now, we'll store it in a static variable that can be accessed elsewhere
+    KeyboardHeightStorage.setKeyboardHeight(height);
   }
 
   void _createGroup() {
@@ -85,6 +114,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Capture keyboard height when keyboard appears
+    _captureKeyboardHeight();
+
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('Create New Group'),
@@ -115,12 +147,82 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 placeholder: 'Search contacts...',
               ),
             ),
+            // Search filter options
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            searchName ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
+                            size: 16,
+                            color: searchName ? CupertinoColors.systemBlue : CupertinoColors.systemGrey,
+                          ),
+                          const SizedBox(width: 4),
+                          const Text('Name', style: TextStyle(fontSize: 14)),
+                        ],
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          searchName = !searchName;
+                          _filterContacts();
+                        });
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            searchCompany ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
+                            size: 16,
+                            color: searchCompany ? CupertinoColors.systemBlue : CupertinoColors.systemGrey,
+                          ),
+                          const SizedBox(width: 4),
+                          const Text('Company', style: TextStyle(fontSize: 14)),
+                        ],
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          searchCompany = !searchCompany;
+                          _filterContacts();
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Expanded(
               child: ListView.builder(
                 itemCount: filteredContacts.length,
                 itemBuilder: (context, index) {
                   final contact = filteredContacts[index];
                   final isSelected = selectedContacts.contains(contact);
+                  final searchResult = _searchController.text.isNotEmpty
+                      ? ContactSearchService.getSearchResult(contact, _searchController.text)
+                      : null;
+
+                  // Get company info for display
+                  String companyInfo = '';
+                  if (contact.organizations.isNotEmpty) {
+                    final org = contact.organizations.first;
+                    if (org.company.isNotEmpty) {
+                      companyInfo = org.company;
+                      if (org.title.isNotEmpty) {
+                        companyInfo += ' • ${org.title}';
+                      }
+                    }
+                  }
+
                   return CupertinoListTile(
                     leading: CircleAvatar(
                       backgroundColor: const Color(0xFF0fa0ab),
@@ -130,17 +232,47 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                       ),
                     ),
                     title: Text(contact.displayName),
-                    trailing: CupertinoSwitch(
-                      value: isSelected,
-                      onChanged: (bool value) {
-                        setState(() {
-                          if (value) {
-                            selectedContacts.add(contact);
-                          } else {
-                            selectedContacts.remove(contact);
-                          }
-                        });
-                      },
+                    subtitle: companyInfo.isNotEmpty
+                        ? Text(
+                            companyInfo,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: CupertinoColors.systemGrey,
+                            ),
+                          )
+                        : null,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (searchResult != null && searchResult.matchSummary.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: CupertinoColors.systemBlue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              searchResult.matchSummary,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: CupertinoColors.systemBlue,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 8),
+                        CupertinoSwitch(
+                          value: isSelected,
+                          onChanged: (bool value) {
+                            setState(() {
+                              if (value) {
+                                selectedContacts.add(contact);
+                              } else {
+                                selectedContacts.remove(contact);
+                              }
+                            });
+                          },
+                        ),
+                      ],
                     ),
                   );
                 },

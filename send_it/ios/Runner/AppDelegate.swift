@@ -8,6 +8,7 @@ import MobileCoreServices
 @main
 @objc class AppDelegate: FlutterAppDelegate, MFMessageComposeViewControllerDelegate {
   private var pendingResult: FlutterResult?
+  private var temporaryFiles: [URL] = []
 
   override func application(
     _ application: UIApplication,
@@ -62,16 +63,28 @@ import MobileCoreServices
 
           // Add media attachments if provided
           if let mediaPaths = mediaPaths {
-              for mediaPath in mediaPaths {
+              print("Processing \(mediaPaths.count) media attachments for recipient: \(recipient)")
+
+              for (index, mediaPath) in mediaPaths.enumerated() {
                   let mediaURL = URL(fileURLWithPath: mediaPath)
+                  print("Processing media \(index + 1): \(mediaPath)")
+
                   if FileManager.default.fileExists(atPath: mediaPath) {
                       do {
-                          let mediaData = try Data(contentsOf: mediaURL)
+                                  let mediaData = try Data(contentsOf: mediaURL)
                           let pathExtension = mediaURL.pathExtension.lowercased()
 
-                          // Create a temporary file with the correct extension
+                          // Create a unique temporary file with timestamp for better uniqueness
                           let tempDir = FileManager.default.temporaryDirectory
-                          let tempFile = tempDir.appendingPathComponent(UUID().uuidString + "." + pathExtension)
+                          let timestamp = Int(Date().timeIntervalSince1970 * 1000)
+                          let uniqueId = UUID().uuidString
+                          let tempFile = tempDir.appendingPathComponent("sendit_\(timestamp)_\(uniqueId).\(pathExtension)")
+
+                          // Ensure the temporary file doesn't already exist
+                          if FileManager.default.fileExists(atPath: tempFile.path) {
+                              try FileManager.default.removeItem(at: tempFile)
+                          }
+
                           try mediaData.write(to: tempFile)
 
                           // Get the UTI for the file
@@ -80,16 +93,55 @@ import MobileCoreServices
                               typeIdentifier = uti as String
                           }
 
-                          if let typeIdentifier = typeIdentifier {
-                              messageVC.addAttachmentURL(tempFile, withAlternateFilename: mediaURL.lastPathComponent)
+                                          if let typeIdentifier = typeIdentifier {
+                              // Try using addAttachmentData instead of addAttachmentURL for better reliability
+                              // This approach avoids potential file system issues with multiple composers
+                              do {
+                                  let filename = mediaURL.lastPathComponent
+                                  let success = messageVC.addAttachmentData(mediaData, typeIdentifier: typeIdentifier, filename: filename)
+
+                                  if success {
+                                      // Track the temporary file for cleanup (still needed for consistency)
+                                      self.temporaryFiles.append(tempFile)
+
+                                      // Force a reload of the message composer view to ensure attachments are displayed
+                                      messageVC.view.setNeedsLayout()
+                                      messageVC.view.layoutIfNeeded()
+                                  } else {
+                                      print("Failed to add attachment data - addAttachmentData returned false")
+                                      // Clean up the temporary file
+                                      try? FileManager.default.removeItem(at: tempFile)
+                                      result(FlutterError(code: "ATTACHMENT_FAILED", message: "Failed to add attachment data", details: nil))
+                                      return
+                                  }
+
+                              } catch {
+                                  print("Exception in addAttachmentData: \(error)")
+                                  // Fallback to URL method if data method fails
+                                  print("Falling back to addAttachmentURL method")
+                                  do {
+                                      try messageVC.addAttachmentURL(tempFile, withAlternateFilename: mediaURL.lastPathComponent)
+                                      // Track the temporary file for cleanup
+                                      self.temporaryFiles.append(tempFile)
+                                      print("Successfully attached via fallback: \(mediaURL.lastPathComponent) as \(tempFile.path)")
+                                  } catch {
+                                      print("Both attachment methods failed: \(error)")
+                                      // Clean up the temporary file if attachment failed
+                                      try? FileManager.default.removeItem(at: tempFile)
+                                      result(FlutterError(code: "ATTACHMENT_FAILED", message: "Failed to add attachment: \(error.localizedDescription)", details: nil))
+                                      return
+                                  }
+                              }
                           } else {
                               print("Could not determine UTI for file: \(mediaPath)")
+                              // Clean up the temporary file
+                              try? FileManager.default.removeItem(at: tempFile)
                               result(FlutterError(code: "MEDIA_TYPE_ERROR", message: "Could not determine media type", details: nil))
                               return
                           }
                       } catch {
-                          print("Error attaching media: \(error)")
-                          result(FlutterError(code: "MEDIA_ATTACHMENT_ERROR", message: "Failed to attach media: \(error.localizedDescription)", details: nil))
+                          print("Error processing media: \(error)")
+                          result(FlutterError(code: "MEDIA_ATTACHMENT_ERROR", message: "Failed to process media: \(error.localizedDescription)", details: nil))
                           return
                       }
                   } else {
@@ -103,7 +155,24 @@ import MobileCoreServices
           // Store the result to be called later
           self.pendingResult = result
 
-          controller.present(messageVC, animated: true, completion: nil)
+          // Only add delays when there are attachments, as the issue only occurs with attachments
+          if mediaPaths != nil && !(mediaPaths?.isEmpty ?? true) {
+              // Add a delay before presenting to allow system cleanup from previous composer
+              DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                  // Present the message composer with a completion handler to ensure it's fully loaded
+                  controller.present(messageVC, animated: true, completion: {
+                      // Give the composer additional time to fully load and display attachments
+                      DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                          // Force a final layout refresh after presentation
+                          messageVC.view.setNeedsLayout()
+                          messageVC.view.layoutIfNeeded()
+                      }
+                  })
+              }
+          } else {
+              // No attachments - present immediately without delays
+              controller.present(messageVC, animated: true, completion: nil)
+          }
         } else {
           result(FlutterError(code: "SMS_NOT_AVAILABLE", message: "SMS is not available", details: nil))
         }
@@ -119,6 +188,9 @@ import MobileCoreServices
   func messageComposeViewController(_ controller: MFMessageComposeViewController, didFinishWith result: MessageComposeResult) {
     controller.dismiss(animated: true, completion: nil)
 
+    // Clean up temporary files after the message composer is dismissed
+    cleanupTemporaryFiles()
+
     // Send the result back to Flutter
     switch result {
     case .sent:
@@ -131,5 +203,19 @@ import MobileCoreServices
       pendingResult?(FlutterError(code: "UNKNOWN_RESULT", message: "Unknown result", details: nil))
     }
     pendingResult = nil
+  }
+
+  private func cleanupTemporaryFiles() {
+    for tempFile in temporaryFiles {
+      do {
+        if FileManager.default.fileExists(atPath: tempFile.path) {
+          try FileManager.default.removeItem(at: tempFile)
+          print("Cleaned up temporary file: \(tempFile.path)")
+        }
+      } catch {
+        print("Failed to clean up temporary file \(tempFile.path): \(error)")
+      }
+    }
+    temporaryFiles.removeAll()
   }
 }

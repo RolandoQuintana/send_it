@@ -15,7 +15,7 @@ class MoreScreen extends StatelessWidget {
           children: [
             const SizedBox(height: 32),
             _SectionHeader(label: 'Shortcuts'),
-            _ShortcutSection(),
+            _ShortcutSection(context),
           ],
         ),
       ),
@@ -45,6 +45,36 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _ShortcutSection extends StatelessWidget {
+  final BuildContext parentContext;
+  const _ShortcutSection(this.parentContext);
+
+  void _onInstallTapped() {
+    showCupertinoDialog(
+      context: parentContext,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('Install Blast'),
+        content: const Text(
+          'A share sheet will appear. Tap the Shortcuts icon to add Blast to your library.',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(ctx),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: const Text('Continue'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ShortcutService.markBlastInstalled();
+              ShortcutService.openInstallPage();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -81,7 +111,7 @@ class _ShortcutSection extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Send It Blast',
+                            'Sent It Blast',
                             style: TextStyle(
                               color: CupertinoColors.white,
                               fontSize: 16,
@@ -117,11 +147,12 @@ class _ShortcutSection extends StatelessWidget {
                   child: CupertinoButton(
                     color: const Color(0xFF0fa0ab),
                     borderRadius: BorderRadius.circular(10),
-                    onPressed: () => ShortcutService.openInstallPage(),
+                    onPressed: _onInstallTapped,
                     child: const Text(
                       'Install Shortcut',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
+                        color: CupertinoColors.white,
                       ),
                     ),
                   ),
@@ -129,67 +160,7 @@ class _ShortcutSection extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            height: 0.5,
-            color: CupertinoColors.systemGrey4,
-          ),
-          _ManualSetupTile(context),
         ],
-      ),
-    );
-  }
-
-  Widget _ManualSetupTile(BuildContext context) {
-    return CupertinoButton(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      onPressed: () => _showManualSetup(context),
-      child: Row(
-        children: const [
-          Expanded(
-            child: Text(
-              'Set up manually',
-              style: TextStyle(
-                color: CupertinoColors.systemGrey,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          Icon(
-            CupertinoIcons.chevron_right,
-            color: CupertinoColors.systemGrey,
-            size: 14,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showManualSetup(BuildContext context) {
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) => CupertinoActionSheet(
-        title: const Text('Manual Setup'),
-        message: const Text(
-          'In the Shortcuts app, create a new shortcut named exactly '
-          '"Send It Blast" with the following steps:\n\n'
-          '1. Get Clipboard\n'
-          '2. Repeat with Each [Clipboard]\n'
-          '   a. Get Dictionary Value → key: "number" from [Repeat Item]\n'
-          '   b. Get Dictionary Value → key: "message" from [Repeat Item]\n'
-          '   c. Send Message [message] to [number]\n\n'
-          'Make sure the shortcut name matches exactly.',
-        ),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Got it'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(context),
-          isDefaultAction: true,
-          child: const Text('Close'),
-        ),
       ),
     );
   }
@@ -200,7 +171,7 @@ class _HowItWorksList extends StatelessWidget {
   Widget build(BuildContext context) {
     const steps = [
       (icon: CupertinoIcons.pencil, text: 'Compose your message in Send It'),
-      (icon: CupertinoIcons.bolt, text: 'Tap "Send via Shortcut" in the + menu'),
+      (icon: CupertinoIcons.bolt, text: 'Tap "Blast" in the + menu'),
       (icon: CupertinoIcons.arrow_right_circle, text: 'The Shortcuts app opens automatically'),
       (icon: CupertinoIcons.checkmark_circle, text: 'Each contact gets an individual message — no tapping through'),
     ];

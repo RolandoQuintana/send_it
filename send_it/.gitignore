@@ -46,3 +46,11 @@ app.*.map.json
 
 # FVM Version Cache
 .fvm/
+# TAC OS agentic artifacts
+agents/
+logs/
+state.json
+state.*.json
+.env
+.env.local
+

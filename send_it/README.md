@@ -1,16 +1,59 @@
 # send_it
 
-A new Flutter project.
+A group messaging app for iOS — send messages to contact groups via your preferred apps.
 
-## Getting Started
+## Install
 
-This project is a starting point for a Flutter application.
+```bash
+fvm install          # if first time (see .fvmrc)
+fvm flutter pub get
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Start
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```bash
+fvm flutter run
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Test
+
+```bash
+fvm flutter test
+```
+
+## Lint / Analyze
+
+```bash
+fvm flutter analyze
+```
+
+## Build (iOS)
+
+```bash
+fvm flutter build ios --no-codesign
+```
+
+---
+
+## TAC OS
+
+This project uses [TAC OS](tac-os/README.md) for agentic development (git submodule).
+
+**Setup (already done):**
+```bash
+git submodule update --init --recursive
+./tac-os/scripts/bootstrap.sh --brownfield
+```
+
+**First workflow (fresh agent each step):**
+1. `/prime`
+2. `/chore "your first chore"` or `/research "new feature idea"`
+3. `/implement specs/<plan>.md`
+
+See `tac-os/BOOTSTRAP.md` for full guide.
+
+**Update TAC OS submodule:**
+```bash
+cd tac-os && git pull origin main && cd ..
+git add tac-os && git commit -m "chore: bump tac-os submodule"
+```

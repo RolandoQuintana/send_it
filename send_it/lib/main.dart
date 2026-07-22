@@ -9,7 +9,6 @@ import 'models/message_group.dart';
 import 'screens/create_group_screen.dart';
 import 'screens/group_message_screen.dart';
 import 'services/group_storage.dart';
-import 'services/keyboard_height_storage.dart';
 
 void main() {
   runApp(const SendItApp());
@@ -174,21 +173,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Get the stored maximum keyboard height for use in UI calculations
-  double? getKeyboardHeight() {
-    return KeyboardHeightStorage.getKeyboardHeight();
-  }
-
-  /// Check if keyboard height has been captured
-  bool hasKeyboardHeight() {
-    return KeyboardHeightStorage.hasKeyboardHeight();
-  }
-
-  /// Get the maximum keyboard height as a string for display
-  String getKeyboardHeightString() {
-    return KeyboardHeightStorage.getKeyboardHeightString();
-  }
-
   void _openGroup(MessageGroup group) {
     Navigator.push(
       context,
@@ -196,7 +180,6 @@ class _HomePageState extends State<HomePage> {
         builder: (context) => GroupMessageScreen(
           group: group,
           allContacts: allContacts,
-          keyboardHeight: getKeyboardHeight(),
           onGroupUpdated: (updatedGroup) async {
             await GroupStorage.updateGroup(updatedGroup);
             await _loadGroups();
@@ -240,16 +223,6 @@ class _HomePageState extends State<HomePage> {
                                 color: CupertinoColors.systemGrey,
                               ),
                             ),
-                            if (hasKeyboardHeight()) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Max keyboard height: ${getKeyboardHeightString()}px',
-                                style: const TextStyle(
-                                  color: CupertinoColors.systemBlue,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
                             const SizedBox(height: 16),
                             CupertinoButton.filled(
                               onPressed: _createNewGroup,
@@ -318,60 +291,5 @@ class _HomePageState extends State<HomePage> {
     _messageController.dispose();
     _searchController.dispose();
     super.dispose();
-  }
-}
-
-class MessageComposer extends StatelessWidget {
-  final Contact contact;
-  final String message;
-  final VoidCallback onSend;
-  final VoidCallback onCancel;
-
-  const MessageComposer({
-    super.key,
-    required this.contact,
-    required this.message,
-    required this.onSend,
-    required this.onCancel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: CircleAvatar(
-              child: Text(contact.displayName[0]),
-            ),
-            title: Text(contact.displayName),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              message,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: onCancel,
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: onSend,
-                child: const Text('Send'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
   }
 }

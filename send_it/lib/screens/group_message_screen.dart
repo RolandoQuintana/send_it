@@ -6,7 +6,6 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../models/message_group.dart';
 import '../services/group_storage.dart';
-import '../services/keyboard_height_storage.dart';
 import 'edit_group_screen.dart';
 
 class GroupMessageScreen extends StatefulWidget {
@@ -14,7 +13,6 @@ class GroupMessageScreen extends StatefulWidget {
   final List<Contact> allContacts;
   final Function(MessageGroup) onGroupUpdated;
   final Function(String) onGroupDeleted;
-  final double? keyboardHeight;
 
   const GroupMessageScreen({
     super.key,
@@ -22,7 +20,6 @@ class GroupMessageScreen extends StatefulWidget {
     required this.allContacts,
     required this.onGroupUpdated,
     required this.onGroupDeleted,
-    this.keyboardHeight,
   });
 
   @override
@@ -46,23 +43,6 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
     _messageController.addListener(() {
       setState(() {}); // Rebuild to update send button state
     });
-
-    // Debug: Print keyboard height status
-    if (widget.keyboardHeight != null) {
-      print('GroupMessageScreen using provided keyboard height: ${widget.keyboardHeight}px');
-    } else if (KeyboardHeightStorage.hasKeyboardHeight()) {
-      print('GroupMessageScreen using stored keyboard height: ${KeyboardHeightStorage.getKeyboardHeight()}px');
-    } else {
-      print('GroupMessageScreen will capture keyboard height when keyboard appears');
-    }
-  }
-
-  void _captureKeyboardHeight() {
-    final currentKeyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-    if (currentKeyboardHeight > 0) {
-      // Store the keyboard height globally for future use (only updates if larger)
-      KeyboardHeightStorage.setKeyboardHeight(currentKeyboardHeight);
-    }
   }
 
   Future<void> _pickMedia() async {
@@ -338,42 +318,21 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
   }
 
   void _toggleActionButtons() {
-    final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+    final trayOpen = _showActionButtons || _showVariablesList;
 
     setState(() {
-      if (_showVariablesList) {
-        // If variables list is open, close it and return to action buttons
+      if (trayOpen) {
+        _showActionButtons = false;
         _showVariablesList = false;
-        _showActionButtons = true;
-      } else if (keyboardVisible) {
-        // If keyboard is visible, dismiss it to show action menu
-        _dismissKeyboard();
-        if (!_showActionButtons) {
-          _showActionButtons = true;
-        }
-      } else if (_showActionButtons) {
-        // If action buttons are open and no keyboard, show keyboard (keep menu open)
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _textFieldFocusNode.requestFocus();
-        });
       } else {
-        // If nothing is open, show action buttons
         _showActionButtons = true;
-        _dismissKeyboard();
+        _showVariablesList = false;
       }
     });
   }
 
   Widget _buildActionButtons() {
-    if (!_showActionButtons) return const SizedBox.shrink();
-
-    // Use the provided keyboard height, or fallback to stored height, or default
-    final menuHeight = widget.keyboardHeight ??
-                      KeyboardHeightStorage.getKeyboardHeight() ??
-                      400.0;
-
     return Container(
-      height: menuHeight,
       decoration: BoxDecoration(
         color: CupertinoColors.black,
         border: Border(
@@ -413,77 +372,252 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
   }
 
   Widget _buildVariablesList() {
-    if (!_showVariablesList) return const SizedBox.shrink();
-
-    // Use consistent height to match keyboard behavior
-    final menuHeight = widget.keyboardHeight ??
-                      KeyboardHeightStorage.getKeyboardHeight() ??
-                      300.0;
-
-    return Container(
-      height: menuHeight,
-      decoration: BoxDecoration(
-        color: CupertinoColors.black,
-        border: Border(
-          top: BorderSide(color: CupertinoColors.systemGrey4, width: 0.5),
-          bottom: BorderSide(color: CupertinoColors.systemGrey4, width: 0.5),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Header with back button
-          Container(
-            height: 40,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: const Color.fromARGB(255, 59, 59, 59),
-              border: Border(
-                bottom: BorderSide(color: CupertinoColors.systemGrey4, width: 0.5),
-              ),
-            ),
-            child: Row(
-              children: [
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  child: const Icon(
-                    CupertinoIcons.back,
-                    color: Color(0xFF0fa0ab),
-                    size: 20,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _showVariablesList = false;
-                      _showActionButtons = true;
-                    });
-                  },
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Variables',
-                  style: TextStyle(
-                    color: CupertinoColors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 220),
+      child: Container(
+        decoration: BoxDecoration(
+          color: CupertinoColors.black,
+          border: Border(
+            top: BorderSide(color: CupertinoColors.systemGrey4, width: 0.5),
+            bottom: BorderSide(color: CupertinoColors.systemGrey4, width: 0.5),
           ),
-          // Variables list
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ListView(
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color.fromARGB(255, 59, 59, 59),
+                border: Border(
+                  bottom: BorderSide(color: CupertinoColors.systemGrey4, width: 0.5),
+                ),
+              ),
+              child: Row(
                 children: [
-                  _buildVariableItem(
-                    variable: '{firstname}',
-                    description: 'First name',
-                    example: 'John',
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    child: const Icon(
+                      CupertinoIcons.back,
+                      color: Color(0xFF0fa0ab),
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _showVariablesList = false;
+                        _showActionButtons = true;
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Variables',
+                    style: TextStyle(
+                      color: CupertinoColors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
             ),
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    _buildVariableItem(
+                      variable: '{firstname}',
+                      description: 'First name',
+                      example: 'John',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccessorySlot() {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      child: _showVariablesList
+          ? _buildVariablesList()
+          : _showActionButtons
+              ? _buildActionButtons()
+              : const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildUnifiedBottomPanel() {
+    return SafeArea(
+      bottom: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(
+              color: CupertinoColors.black,
+              border: Border(
+                top: BorderSide(
+                  color: CupertinoColors.systemGrey4,
+                  width: 0.5,
+                ),
+              ),
+            ),
+            child: Column(
+              children: [
+                if (_selectedMedia.isNotEmpty)
+                  Container(
+                    height: 100,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _selectedMedia.length,
+                      itemBuilder: (context, index) {
+                        return Container(
+                          width: 100,
+                          margin: const EdgeInsets.only(right: 8),
+                          child: Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(
+                                  _selectedMedia[index],
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: CupertinoButton(
+                                  padding: EdgeInsets.zero,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: CupertinoColors.black.withOpacity(0.5),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      CupertinoIcons.xmark,
+                                      color: CupertinoColors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _selectedMedia.removeAt(index);
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                Row(
+                  children: [
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      child: Icon(
+                        (_showActionButtons || _showVariablesList) ? CupertinoIcons.minus : CupertinoIcons.add,
+                        color: (_showActionButtons || _showVariablesList) ? const Color(0xFF0fa0ab) : CupertinoColors.systemGrey,
+                      ),
+                      onPressed: _toggleActionButtons,
+                    ),
+                    Expanded(
+                      child: CupertinoTextField(
+                        controller: _messageController,
+                        focusNode: _textFieldFocusNode,
+                        placeholder: 'Enter your message',
+                        minLines: 1,
+                        maxLines: 4,
+                        textInputAction: TextInputAction.newline,
+                        onTap: () {
+                          // Do not collapse menus; let the keyboard overlay them
+                        },
+                        decoration: BoxDecoration(
+                          border: Border.all(color: CupertinoColors.systemGrey4),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: Stack(
+                        children: [
+                          CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            child: Container(
+                              width: 45,
+                              height: 45,
+                              decoration: BoxDecoration(
+                                color: (selectedContacts.isNotEmpty && _messageController.text.trim().isNotEmpty)
+                                    ? const Color(0xFF0fa0ab)
+                                    : CupertinoColors.systemGrey,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Icon(
+                                CupertinoIcons.paperplane_fill,
+                                color: (selectedContacts.isNotEmpty && _messageController.text.trim().isNotEmpty)
+                                    ? CupertinoColors.white
+                                    : CupertinoColors.systemGrey2,
+                                size: 20,
+                              ),
+                            ),
+                            onPressed: (selectedContacts.isNotEmpty && _messageController.text.trim().isNotEmpty)
+                                ? _sendMessages
+                                : null,
+                          ),
+                          if (selectedContacts.isNotEmpty)
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: CupertinoColors.systemRed,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: CupertinoColors.black,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 16,
+                                  minHeight: 16,
+                                ),
+                                child: Text(
+                                  '${selectedContacts.length}',
+                                  style: const TextStyle(
+                                    color: CupertinoColors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
+          _buildAccessorySlot(),
         ],
       ),
     );
@@ -609,260 +743,87 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Capture keyboard height if not provided and keyboard is visible
-    if (widget.keyboardHeight == null) {
-      _captureKeyboardHeight();
-    }
-
     final bool allSelected = selectedContacts.length == widget.group.members.length;
 
-    return GestureDetector(
-      onTap: _dismissEverything,
-      child: CupertinoPageScaffold(
-        resizeToAvoidBottomInset: false,
-        navigationBar: CupertinoNavigationBar(
-          middle: Text(widget.group.name),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                child: Icon(
-                  allSelected ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
-                  color: allSelected ? const Color(0xFF0fa0ab) : CupertinoColors.systemGrey,
-                ),
-                onPressed: () {
-                  setState(() {
-                    if (allSelected) {
-                      selectedContacts.clear();
-                    } else {
-                      selectedContacts = List.from(widget.group.members);
-                    }
-                  });
-                },
-              ),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                child: const Icon(CupertinoIcons.pencil),
-                onPressed: _editGroup,
-              ),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                child: const Icon(CupertinoIcons.delete),
-                onPressed: _deleteGroup,
-              ),
-            ],
-          ),
-        ),
-        child: SafeArea(
-        child: Column(
+    return CupertinoPageScaffold(
+      resizeToAvoidBottomInset: true,
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(widget.group.name),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: ListView.builder(
-                itemCount: widget.group.members.length,
-                itemBuilder: (context, index) {
-                  final contact = widget.group.members[index];
-                  final isSelected = selectedContacts.contains(contact);
-                  return CupertinoListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: const Color(0xFF0fa0ab),
-                      child: Text(
-                        contact.displayName[0],
-                        style: const TextStyle(color: CupertinoColors.white),
-                      ),
-                    ),
-                    title: Text(contact.displayName),
-                    subtitle: Text(contact.phones.firstOrNull?.number ?? 'No phone number'),
-                    trailing: CupertinoSwitch(
-                      value: isSelected,
-                      onChanged: (bool value) {
-                        setState(() {
-                          if (value) {
-                            selectedContacts.add(contact);
-                          } else {
-                            selectedContacts.remove(contact);
-                          }
-                        });
-                      },
-                    ),
-                  );
-                },
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: Icon(
+                allSelected ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
+                color: allSelected ? const Color(0xFF0fa0ab) : CupertinoColors.systemGrey,
               ),
+              onPressed: () {
+                setState(() {
+                  if (allSelected) {
+                    selectedContacts.clear();
+                  } else {
+                    selectedContacts = List.from(widget.group.members);
+                  }
+                });
+              },
             ),
-            // Keep the composer fixed relative to the viewport; when the keyboard
-            // is visible and no action menu is open, offset it upward by the
-            // keyboard height so it stays just above the keyboard.
-            Padding(
-              padding: EdgeInsets.only(
-                bottom: (_showActionButtons || _showVariablesList)
-                    ? 0.0
-                    : MediaQuery.of(context).viewInsets.bottom.toDouble(),
-              ),
-              child: Container(
-              padding: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                color: CupertinoColors.black,
-                border: Border(
-                  top: BorderSide(
-                    color: CupertinoColors.systemGrey4,
-                    width: 0.5,
-                  ),
-                ),
-              ),
-              child: Column(
-                children: [
-
-                  if (_selectedMedia.isNotEmpty)
-                    Container(
-                      height: 100,
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _selectedMedia.length,
-                        itemBuilder: (context, index) {
-                          return Container(
-                            width: 100,
-                            margin: const EdgeInsets.only(right: 8),
-                            child: Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    _selectedMedia[index],
-                                    width: 100,
-                                    height: 100,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 4,
-                                  right: 4,
-                                  child: CupertinoButton(
-                                    padding: EdgeInsets.zero,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: CupertinoColors.black.withOpacity(0.5),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        CupertinoIcons.xmark,
-                                        color: CupertinoColors.white,
-                                        size: 16,
-                                      ),
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _selectedMedia.removeAt(index);
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  Row(
-                    children: [
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        child: Icon(
-                          ((_showActionButtons || _showVariablesList) && MediaQuery.of(context).viewInsets.bottom == 0) ? CupertinoIcons.minus : CupertinoIcons.add,
-                          color: ((_showActionButtons || _showVariablesList) && MediaQuery.of(context).viewInsets.bottom == 0) ? const Color(0xFF0fa0ab) : CupertinoColors.systemGrey,
-                        ),
-                        onPressed: _toggleActionButtons,
-                      ),
-                      Expanded(
-                        child: CupertinoTextField(
-                          controller: _messageController,
-                          focusNode: _textFieldFocusNode,
-                          placeholder: 'Enter your message',
-                          minLines: 1,
-                          maxLines: 4,
-                          textInputAction: TextInputAction.newline,
-                          onTap: () {
-                            // Do not collapse menus; let the keyboard overlay them
-                          },
-                          decoration: BoxDecoration(
-                            border: Border.all(color: CupertinoColors.systemGrey4),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8.0),
-                        child: Stack(
-                          children: [
-                            CupertinoButton(
-                              padding: EdgeInsets.zero,
-                              child: Container(
-                                width: 45,
-                                height: 45,
-                                decoration: BoxDecoration(
-                                  color: (selectedContacts.isNotEmpty && _messageController.text.trim().isNotEmpty)
-                                      ? const Color(0xFF0fa0ab)
-                                      : CupertinoColors.systemGrey,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Icon(
-                                  CupertinoIcons.paperplane_fill,
-                                  color: (selectedContacts.isNotEmpty && _messageController.text.trim().isNotEmpty)
-                                      ? CupertinoColors.white
-                                      : CupertinoColors.systemGrey2,
-                                  size: 20,
-                                ),
-                              ),
-                              onPressed: (selectedContacts.isNotEmpty && _messageController.text.trim().isNotEmpty)
-                                  ? _sendMessages
-                                  : null,
-                            ),
-                            if (selectedContacts.isNotEmpty)
-                              Positioned(
-                                top: 0,
-                                left: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: BoxDecoration(
-                                    color: CupertinoColors.systemRed,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: CupertinoColors.black,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  constraints: const BoxConstraints(
-                                    minWidth: 16,
-                                    minHeight: 16,
-                                  ),
-                                  child: Text(
-                                    '${selectedContacts.length}',
-                                    style: const TextStyle(
-                                      color: CupertinoColors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: const Icon(CupertinoIcons.pencil),
+              onPressed: _editGroup,
             ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: const Icon(CupertinoIcons.delete),
+              onPressed: _deleteGroup,
             ),
-            // Action buttons and variables list (appears below text input)
-            _buildActionButtons(),
-            _buildVariablesList(),
           ],
         ),
       ),
-    )
+      child: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: _dismissEverything,
+                behavior: HitTestBehavior.opaque,
+                child: ListView.builder(
+                  itemCount: widget.group.members.length,
+                  itemBuilder: (context, index) {
+                    final contact = widget.group.members[index];
+                    final isSelected = selectedContacts.contains(contact);
+                    return CupertinoListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: const Color(0xFF0fa0ab),
+                        child: Text(
+                          contact.displayName[0],
+                          style: const TextStyle(color: CupertinoColors.white),
+                        ),
+                      ),
+                      title: Text(contact.displayName),
+                      subtitle: Text(contact.phones.firstOrNull?.number ?? 'No phone number'),
+                      trailing: CupertinoSwitch(
+                        value: isSelected,
+                        onChanged: (bool value) {
+                          setState(() {
+                            if (value) {
+                              selectedContacts.add(contact);
+                            } else {
+                              selectedContacts.remove(contact);
+                            }
+                          });
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            _buildUnifiedBottomPanel(),
+          ],
+        ),
+      ),
     );
   }
 

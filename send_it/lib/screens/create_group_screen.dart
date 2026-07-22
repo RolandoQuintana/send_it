@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import '../models/message_group.dart';
 import '../services/contact_search_service.dart';
-import '../services/keyboard_height_storage.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   final List<Contact> allContacts;
@@ -26,7 +25,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   List<Contact> filteredContacts = [];
   bool searchName = true;
   bool searchCompany = true;
-  double? keyboardHeight;
 
   @override
   void initState() {
@@ -45,27 +43,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         searchCompany: searchCompany,
       );
     });
-  }
-
-  void _captureKeyboardHeight() {
-    final currentKeyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-    if (currentKeyboardHeight > 0) {
-      // Update if this is the first capture or if it's larger than what we have
-      if (keyboardHeight == null || currentKeyboardHeight > keyboardHeight!) {
-        setState(() {
-          keyboardHeight = currentKeyboardHeight;
-        });
-        // Store globally for use elsewhere in the app
-        _storeKeyboardHeightGlobally(currentKeyboardHeight);
-        print('Keyboard height updated: ${currentKeyboardHeight}px (max so far)');
-      }
-    }
-  }
-
-  void _storeKeyboardHeightGlobally(double height) {
-    // You can store this in SharedPreferences, a global variable, or pass it back to parent
-    // For now, we'll store it in a static variable that can be accessed elsewhere
-    KeyboardHeightStorage.setKeyboardHeight(height);
   }
 
   void _createGroup() {
@@ -114,9 +91,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Capture keyboard height when keyboard appears
-    _captureKeyboardHeight();
-
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('Create New Group'),

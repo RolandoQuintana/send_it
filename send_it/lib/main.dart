@@ -8,6 +8,7 @@ import 'package:upgrader/upgrader.dart';
 import 'models/message_group.dart';
 import 'screens/create_group_screen.dart';
 import 'screens/group_message_screen.dart';
+import 'screens/more_screen.dart';
 import 'services/group_storage.dart';
 
 void main() {
@@ -196,8 +197,16 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('Sent It'),
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('Sent It'),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => Navigator.push(
+            context,
+            CupertinoPageRoute(builder: (_) => const MoreScreen()),
+          ),
+          child: const Icon(CupertinoIcons.ellipsis_circle),
+        ),
       ),
       child: SafeArea(
         child: Stack(

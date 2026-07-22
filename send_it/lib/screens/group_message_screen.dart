@@ -7,7 +7,9 @@ import 'dart:io';
 import '../models/message_group.dart';
 import '../services/group_storage.dart';
 import '../services/keyboard_height_storage.dart';
+import '../services/shortcut_service.dart';
 import 'edit_group_screen.dart';
+import 'more_screen.dart';
 
 class GroupMessageScreen extends StatefulWidget {
   final MessageGroup group;
@@ -94,15 +96,6 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
     }
   }
 
-  String _personalizeMessage(String template, Contact contact) {
-    // Extract first name from display name
-    final nameParts = contact.displayName.trim().split(' ');
-    final firstName = nameParts.isNotEmpty ? nameParts.first : '';
-
-    // Replace {firstname} with the actual first name
-    return template.replaceAll('{firstname}', firstName);
-  }
-
   Future<void> _sendMessages() async {
     if (_messageController.text.isEmpty && _selectedMedia.isEmpty) {
       showCupertinoDialog(
@@ -145,8 +138,7 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
       // Clean up phone number format
       final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
 
-      // Personalize the message for this contact
-      final personalizedMessage = _personalizeMessage(_messageController.text, contact);
+      final personalizedMessage = ShortcutService.personalizeMessage(_messageController.text, contact);
 
       try {
         // Create fresh copies of media files for each message to avoid conflicts
@@ -265,6 +257,171 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
       } catch (e) {
         // Ignore cleanup errors
       }
+    }
+  }
+
+  Future<void> _sendViaShortcut() async {
+    if (_messageController.text.trim().isEmpty) {
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('No Message'),
+          content: const Text('Please enter a message before sending via Blast.'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (selectedContacts.isEmpty) {
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('No Recipients'),
+          content: const Text('Please select at least one contact.'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final blastInstalled = await ShortcutService.isBlastInstalled();
+    if (!mounted) return;
+    if (!blastInstalled) {
+      showCupertinoDialog(
+        context: context,
+        builder: (ctx) => CupertinoAlertDialog(
+          title: const Text('Set Up Required'),
+          content: const Text(
+            'You need to install the Blast shortcut before using this feature.',
+          ),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('Don\'t Show Again'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                ShortcutService.markBlastInstalled();
+              },
+            ),
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              child: const Text('Set Up Blast'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  CupertinoPageRoute(builder: (_) => const MoreScreen()),
+                );
+              },
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final hasExtraMedia = _selectedMedia.length > 1;
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Send via Blast?'),
+        content: Text(
+          'This will automatically send a message to all '
+          '${selectedContacts.length} selected contact${selectedContacts.length == 1 ? '' : 's'} '
+          'with no confirmation per person.'
+          '${hasExtraMedia ? '\n\nOnly the first attachment will be included — Blast supports 1 media file at a time.' : ''}',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _showActionButtons = false);
+
+    final result = await ShortcutService.sendViaShortcut(
+      contacts: selectedContacts,
+      messageTemplate: _messageController.text,
+      mediaFile: _selectedMedia.isNotEmpty ? _selectedMedia.first : null,
+    );
+
+    if (!mounted) return;
+
+    switch (result) {
+      case ShortcutLaunchResult.launched:
+        setState(() {
+          _messageController.clear();
+          _selectedMedia.clear();
+        });
+        showCupertinoDialog(
+          context: context,
+          barrierDismissible: true,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('Blast Launched'),
+            content: const Text(
+              'Your messages are being sent via Blast. '
+              'The Shortcuts app may ask for permission the first time.',
+            ),
+            actions: [
+              CupertinoDialogAction(
+                isDefaultAction: true,
+                child: const Text('Got it'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      case ShortcutLaunchResult.notInstalled:
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('Blast Not Installed'),
+            content: const Text(
+              'Blast isn\'t set up yet. '
+              'Go to More → Install Shortcut to get started.',
+            ),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      case ShortcutLaunchResult.noValidContacts:
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('No Valid Numbers'),
+            content: const Text('None of the selected contacts have a valid phone number.'),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
     }
   }
 
@@ -405,6 +562,12 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
                   _showVariablesList = true;
                 });
               },
+            ),
+            const SizedBox(width: 16),
+            _buildActionButton(
+              icon: CupertinoIcons.bolt_fill,
+              label: 'Blast',
+              onTap: _sendViaShortcut,
             ),
           ],
         ),
@@ -560,10 +723,16 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
   Widget _buildActionButton({
     required IconData icon,
     required String label,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
+    bool disabled = false,
+    String? disabledReason,
   }) {
+    final iconColor = disabled
+        ? CupertinoColors.systemGrey
+        : const Color(0xFF0fa0ab);
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: disabled ? null : onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -574,18 +743,14 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
               color: CupertinoColors.systemGrey6,
               borderRadius: BorderRadius.circular(30),
             ),
-            child: Icon(
-              icon,
-              color: const Color(0xFF0fa0ab),
-              size: 24,
-            ),
+            child: Icon(icon, color: iconColor, size: 24),
           ),
           const SizedBox(height: 8),
           Text(
-            label,
-            style: const TextStyle(
-              color: CupertinoColors.white,
-              fontSize: 12,
+            disabled && disabledReason != null ? disabledReason : label,
+            style: TextStyle(
+              color: disabled ? CupertinoColors.systemGrey : CupertinoColors.white,
+              fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,

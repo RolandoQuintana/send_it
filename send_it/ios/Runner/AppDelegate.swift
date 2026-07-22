@@ -176,6 +176,22 @@ import MobileCoreServices
         } else {
           result(FlutterError(code: "SMS_NOT_AVAILABLE", message: "SMS is not available", details: nil))
         }
+      } else if call.method == "openShortcutFile" {
+        guard let args = call.arguments as? [String: Any],
+              let filePath = args["filePath"] as? String else {
+          result(FlutterError(code: "INVALID_ARGUMENTS", message: "filePath required", details: nil))
+          return
+        }
+        let fileURL = URL(fileURLWithPath: filePath)
+        DispatchQueue.main.async {
+          let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
+          if let rootVC = self.window?.rootViewController {
+            activityVC.popoverPresentationController?.sourceView = rootVC.view
+            activityVC.popoverPresentationController?.sourceRect = rootVC.view.bounds
+            rootVC.present(activityVC, animated: true, completion: nil)
+          }
+        }
+        result(nil)
       } else {
         result(FlutterMethodNotImplemented)
       }

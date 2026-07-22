@@ -43,3 +43,14 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# FVM Version Cache
+.fvm/
+# TAC OS agentic artifacts
+agents/
+logs/
+state.json
+state.*.json
+.env
+.env.local
+

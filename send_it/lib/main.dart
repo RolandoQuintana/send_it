@@ -10,8 +10,12 @@ import 'screens/create_group_screen.dart';
 import 'screens/group_message_screen.dart';
 import 'screens/more_screen.dart';
 import 'services/group_storage.dart';
+import 'services/subscription_service.dart';
+import 'widgets/subscription_gate.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SubscriptionService.instance.initialize();
   runApp(const SendItApp());
 }
 
@@ -30,13 +34,15 @@ class SendItApp extends StatelessWidget {
           textStyle: TextStyle(color: CupertinoColors.white),
         ),
       ),
-      home: UpgradeAlert(
-        upgrader: Upgrader(
-          // debugLogging: true, // Set to true for debugging
-          debugDisplayAlways: false,
+      home: SubscriptionGate(
+        child: UpgradeAlert(
+          upgrader: Upgrader(
+            // debugLogging: true, // Set to true for debugging
+            debugDisplayAlways: false,
+          ),
+          dialogStyle: UpgradeDialogStyle.cupertino,
+          child: const HomePage(),
         ),
-        dialogStyle: UpgradeDialogStyle.cupertino,
-        child: const HomePage(),
       ),
       debugShowCheckedModeBanner: false,
     );

@@ -1,0 +1,117 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "SENT_IT_STOREKIT",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "19.99",
+      "familyShareable" : false,
+      "internalID" : "6794926972",
+      "localizations" : [
+        {
+          "description" : "Lifetime access to Sent It Pro.",
+          "displayName" : "Sent It Pro Lifetime",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "sent_it_lifetime",
+      "referenceName" : "Sent It Pro Lifetime",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6746167372",
+    "_developerTeamID" : "3R4MQW288D",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "22266457",
+      "localizations" : [
+
+      ],
+      "name" : "Sent It Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "1.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6794926872",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Monthly subscription to Sent It Pro.",
+              "displayName" : "Sent It Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "sent_it_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Sent It Pro Monthly",
+          "subscriptionGroupID" : "22266457",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6794926795",
+          "introductoryOffer" : {
+            "internalID" : "6794926901",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
+          "localizations" : [
+            {
+              "description" : "Annual subscription to Sent It Pro.",
+              "displayName" : "Sent It Pro Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "sent_it_annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Sent It Pro Annual",
+          "subscriptionGroupID" : "22266457",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

@@ -1,11 +1,102 @@
 import 'package:flutter/cupertino.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../constants/subscription_constants.dart';
+import '../services/subscription_service.dart';
 import '../services/shortcut_service.dart';
 
-class MoreScreen extends StatelessWidget {
+class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
 
   @override
+  State<MoreScreen> createState() => _MoreScreenState();
+}
+
+class _MoreScreenState extends State<MoreScreen> {
+  final _subscription = SubscriptionService.instance;
+  bool _isRestoring = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscription.addListener(_onSubscriptionChanged);
+  }
+
+  @override
+  void dispose() {
+    _subscription.removeListener(_onSubscriptionChanged);
+    super.dispose();
+  }
+
+  void _onSubscriptionChanged() {
+    if (mounted) setState(() {});
+  }
+
+  String _proStatusLabel() {
+    switch (_subscription.accessSource) {
+      case ProAccessSource.grandfathered:
+        return 'Lifetime access (original purchase)';
+      case ProAccessSource.entitlement:
+        final productId = _subscription.customerInfo
+            ?.entitlements.active[SubscriptionConstants.entitlementId]
+            ?.productIdentifier;
+        if (productId?.contains('lifetime') == true) {
+          return 'Lifetime Pro';
+        }
+        return 'Pro subscriber';
+      case ProAccessSource.none:
+        return 'Not subscribed';
+    }
+  }
+
+  Future<void> _restorePurchases() async {
+    setState(() => _isRestoring = true);
+    await _subscription.restorePurchases();
+    if (!mounted) return;
+    setState(() => _isRestoring = false);
+
+    if (_subscription.hasPro) {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (ctx) => CupertinoAlertDialog(
+          title: const Text('Restored'),
+          content: const Text('Your purchases have been restored.'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      );
+    } else if (_subscription.errorMessage != null) {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (ctx) => CupertinoAlertDialog(
+          title: const Text('Restore Failed'),
+          content: Text(_subscription.errorMessage!),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final showSubscriptionSection = SubscriptionService.isSubscriptionRequired;
+
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
         middle: Text('More'),
@@ -14,10 +105,95 @@ class MoreScreen extends StatelessWidget {
         child: ListView(
           children: [
             const SizedBox(height: 32),
-            _SectionHeader(label: 'Shortcuts'),
+            if (showSubscriptionSection) ...[
+              _SectionHeader(label: 'Subscription'),
+              _SubscriptionSection(
+                statusLabel: _proStatusLabel(),
+                hasPro: _subscription.hasPro,
+                isGrandfathered: _subscription.isGrandfathered,
+                isRestoring: _isRestoring,
+                onRestore: _restorePurchases,
+                onManageSubscription: () => _openUrl(SubscriptionConstants.manageSubscriptionsUrl),
+                onPrivacyPolicy: () => _openUrl(SubscriptionConstants.privacyPolicyUrl),
+              ),
+              const SizedBox(height: 24),
+            ],
+            const _SectionHeader(label: 'Shortcuts'),
             _ShortcutSection(context),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SubscriptionSection extends StatelessWidget {
+  const _SubscriptionSection({
+    required this.statusLabel,
+    required this.hasPro,
+    required this.isGrandfathered,
+    required this.isRestoring,
+    required this.onRestore,
+    required this.onManageSubscription,
+    required this.onPrivacyPolicy,
+  });
+
+  final String statusLabel;
+  final bool hasPro;
+  final bool isGrandfathered;
+  final bool isRestoring;
+  final VoidCallback onRestore;
+  final VoidCallback onManageSubscription;
+  final VoidCallback onPrivacyPolicy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1C1C1E),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          CupertinoListTile(
+            leading: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: hasPro
+                    ? const Color(0xFF0fa0ab).withOpacity(0.2)
+                    : CupertinoColors.systemGrey.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                hasPro ? CupertinoIcons.checkmark_seal_fill : CupertinoIcons.lock,
+                color: hasPro ? const Color(0xFF0fa0ab) : CupertinoColors.systemGrey,
+                size: 18,
+              ),
+            ),
+            title: const Text('Pro Status'),
+            subtitle: Text(statusLabel),
+          ),
+          if (hasPro && !isGrandfathered)
+            CupertinoListTile(
+              title: const Text('Manage Subscription'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: onManageSubscription,
+            ),
+          CupertinoListTile(
+            title: Text(isRestoring ? 'Restoring...' : 'Restore Purchases'),
+            trailing: isRestoring
+                ? const CupertinoActivityIndicator()
+                : const Icon(CupertinoIcons.arrow_clockwise),
+            onTap: isRestoring ? null : onRestore,
+          ),
+          CupertinoListTile(
+            title: const Text('Privacy Policy'),
+            trailing: const CupertinoListTileChevron(),
+            onTap: onPrivacyPolicy,
+          ),
+        ],
       ),
     );
   }

@@ -19,7 +19,8 @@
 | Contact picker / permissions | `lib/services/contact_search_service.dart`, `permission_handler` in pubspec |
 | Persistence | `lib/services/group_storage.dart`, `lib/services/keyboard_height_storage.dart` |
 | iOS shortcuts | `lib/services/shortcut_service.dart` |
-| Subscriptions / IAP | `ai-docs/revenuecat.md` (create with `/ai-doc` when needed) |
+| Subscriptions / IAP / paywalls / entitlements | `ai-docs/revenuecat.md` |
+| TestFlight / App Store builds / ASC automation | `ai-docs/asc.md` |
 | Feature shipped | `app-docs/<feature>.md` (created by `/document`) |
 
 ## Do Not Read Unless Asked
@@ -33,6 +34,8 @@
 ## Third-Party References
 
 - Read `ai-docs/<vendor>.md` when integrating external SDKs (create via `/ai-doc` first)
+- Read `ai-docs/revenuecat.md` when working on subscriptions, in-app purchases, paywalls, entitlements, or grandfathering
+- Read `ai-docs/asc.md` when working on TestFlight, App Store submissions, builds, ASC-side IAP/subscriptions, or release automation
 
 ## Stack-Specific
 
@@ -40,3 +43,4 @@
 |------------|-----|
 | Flutter / FVM | Use `fvm flutter` for all commands (see `.fvmrc`) |
 | iOS native | `ios/` — only when changing platform config or shortcuts |
+| iOS release / ASC | `ai-docs/asc.md` — TestFlight, builds, App Store Connect CLI |

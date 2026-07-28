@@ -48,6 +48,12 @@ class SubscriptionService extends ChangeNotifier {
     return ProAccessSource.none;
   }
 
+  String get proStatusLabel => formatProStatusLabel(
+        accessSource: accessSource,
+        proEntitlement:
+            _customerInfo?.entitlements.active[SubscriptionConstants.entitlementId],
+      );
+
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
@@ -140,6 +146,40 @@ class SubscriptionService extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  /// Human-readable Pro status for More screen.
+  @visibleForTesting
+  static String formatProStatusLabel({
+    required ProAccessSource accessSource,
+    EntitlementInfo? proEntitlement,
+  }) {
+    switch (accessSource) {
+      case ProAccessSource.grandfathered:
+        return 'Lifetime access (original purchase)';
+      case ProAccessSource.none:
+        return 'Not subscribed';
+      case ProAccessSource.entitlement:
+        if (proEntitlement == null) return 'Pro subscriber';
+        if (proEntitlement.periodType == PeriodType.trial) {
+          final end = _formatExpirationDate(proEntitlement.expirationDate);
+          return end != null ? 'Free trial — ends $end' : 'Free trial';
+        }
+        if (proEntitlement.productIdentifier.contains('lifetime')) {
+          return 'Lifetime Pro';
+        }
+        return 'Pro subscriber';
+    }
+  }
+
+  static String? _formatExpirationDate(String? iso) {
+    if (iso == null || iso.isEmpty) return null;
+    final dt = DateTime.parse(iso).toLocal();
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
 
   /// Whether the user originally paid for the app before the freemium cutoff.

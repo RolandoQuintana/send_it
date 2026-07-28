@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:path_provider/path_provider.dart';
@@ -12,7 +13,12 @@ enum ShortcutLaunchResult { launched, notInstalled, noValidContacts }
 
 class ShortcutService {
 
-  static const String shortcutName = 'Sent It Blast';
+  /// Override in debug builds to target the logging shortcut fork:
+  /// `--dart-define=BLAST_SHORTCUT_NAME="Sent It Blast (Debug)"`
+  static const String shortcutName = String.fromEnvironment(
+    'BLAST_SHORTCUT_NAME',
+    defaultValue: 'Sent It Blast',
+  );
   static const String _installedKey = 'blast_shortcut_installed';
 
   static Future<bool> isBlastInstalled() async {
@@ -28,6 +34,27 @@ class ShortcutService {
   static String personalizeMessage(String template, Contact contact) {
     final firstName = contact.displayName.trim().split(' ').first;
     return template.replaceAll('{firstname}', firstName);
+  }
+
+  /// Builds the JSON array written to the clipboard for Blast.
+  @visibleForTesting
+  static List<Map<String, dynamic>> buildShortcutPayload({
+    required Iterable<({String phone, String displayName})> recipients,
+    required String messageTemplate,
+    String? mediaPath,
+  }) {
+    return recipients
+        .map((recipient) {
+          final number = recipient.phone.replaceAll(RegExp(r'[^0-9+]'), '');
+          if (number.isEmpty) return null;
+          final firstName = recipient.displayName.trim().split(' ').first;
+          final message = messageTemplate.replaceAll('{firstname}', firstName);
+          final item = <String, dynamic>{'number': number, 'message': message};
+          if (mediaPath != null) item['mediaFile'] = mediaPath;
+          return item;
+        })
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   /// Copies [mediaFile] into the app's Documents directory as
@@ -63,23 +90,28 @@ class ShortcutService {
   }) async {
     final mediaPath = await _stageMediaFile(mediaFile);
 
-    final payload = contacts
-        .map((contact) {
-          final raw = contact.phones.firstOrNull?.number;
-          if (raw == null) return null;
-          final number = raw.replaceAll(RegExp(r'[^0-9+]'), '');
-          if (number.isEmpty) return null;
-          final message = personalizeMessage(messageTemplate, contact);
-          final item = <String, dynamic>{'number': number, 'message': message};
-          if (mediaPath != null) item['mediaFile'] = mediaPath;
-          return item;
-        })
-        .whereType<Map<String, dynamic>>()
-        .toList();
+    final payload = buildShortcutPayload(
+      recipients: contacts.map(
+        (contact) => (
+          phone: contact.phones.firstOrNull?.number ?? '',
+          displayName: contact.displayName,
+        ),
+      ),
+      messageTemplate: messageTemplate,
+      mediaPath: mediaPath,
+    );
 
     if (payload.isEmpty) return ShortcutLaunchResult.noValidContacts;
 
-    await Clipboard.setData(ClipboardData(text: jsonEncode(payload)));
+    final encoded = jsonEncode(payload);
+    if (kDebugMode) {
+      debugPrint(
+        '[Blast] payload: ${payload.length} recipients, '
+        '${encoded.length} UTF-8 bytes, shortcut: $shortcutName',
+      );
+    }
+
+    await Clipboard.setData(ClipboardData(text: encoded));
 
     final url = Uri.parse(
       'shortcuts://run-shortcut'

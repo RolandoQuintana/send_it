@@ -53,4 +53,87 @@ void main() {
       );
     });
   });
+
+  group('formatProStatusLabel', () {
+    EntitlementInfo buildEntitlement({
+      String productIdentifier = 'sent_it_annual',
+      String periodType = 'NORMAL',
+      String? expirationDate,
+    }) {
+      return EntitlementInfo.fromJson({
+        'identifier': 'pro',
+        'isActive': true,
+        'willRenew': true,
+        'latestPurchaseDate': '2026-01-01T00:00:00Z',
+        'originalPurchaseDate': '2026-01-01T00:00:00Z',
+        'productIdentifier': productIdentifier,
+        'isSandbox': false,
+        if (periodType != 'NORMAL') 'periodType': periodType,
+        if (expirationDate != null) 'expirationDate': expirationDate,
+      });
+    }
+
+    test('grandfathered returns lifetime access label', () {
+      expect(
+        SubscriptionService.formatProStatusLabel(
+          accessSource: ProAccessSource.grandfathered,
+        ),
+        'Lifetime access (original purchase)',
+      );
+    });
+
+    test('none returns not subscribed', () {
+      expect(
+        SubscriptionService.formatProStatusLabel(accessSource: ProAccessSource.none),
+        'Not subscribed',
+      );
+    });
+
+    test('trial entitlement returns formatted end date', () {
+      final entitlement = buildEntitlement(
+        periodType: 'TRIAL',
+        expirationDate: '2026-01-30T12:00:00Z',
+      );
+      expect(
+        SubscriptionService.formatProStatusLabel(
+          accessSource: ProAccessSource.entitlement,
+          proEntitlement: entitlement,
+        ),
+        'Free trial — ends Jan 30, 2026',
+      );
+    });
+
+    test('trial entitlement without expiration returns free trial', () {
+      final entitlement = buildEntitlement(periodType: 'TRIAL');
+      expect(
+        SubscriptionService.formatProStatusLabel(
+          accessSource: ProAccessSource.entitlement,
+          proEntitlement: entitlement,
+        ),
+        'Free trial',
+      );
+    });
+
+    test('paid annual entitlement returns pro subscriber', () {
+      final entitlement = buildEntitlement();
+      expect(
+        SubscriptionService.formatProStatusLabel(
+          accessSource: ProAccessSource.entitlement,
+          proEntitlement: entitlement,
+        ),
+        'Pro subscriber',
+      );
+    });
+
+    test('lifetime entitlement returns lifetime pro', () {
+      final entitlement = buildEntitlement(productIdentifier: 'sent_it_lifetime');
+      expect(
+        SubscriptionService.formatProStatusLabel(
+          accessSource: ProAccessSource.entitlement,
+          proEntitlement: entitlement,
+        ),
+        'Lifetime Pro',
+      );
+    });
+  });
 }

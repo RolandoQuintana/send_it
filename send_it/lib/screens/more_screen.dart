@@ -32,23 +32,6 @@ class _MoreScreenState extends State<MoreScreen> {
     if (mounted) setState(() {});
   }
 
-  String _proStatusLabel() {
-    switch (_subscription.accessSource) {
-      case ProAccessSource.grandfathered:
-        return 'Lifetime access (original purchase)';
-      case ProAccessSource.entitlement:
-        final productId = _subscription.customerInfo
-            ?.entitlements.active[SubscriptionConstants.entitlementId]
-            ?.productIdentifier;
-        if (productId?.contains('lifetime') == true) {
-          return 'Lifetime Pro';
-        }
-        return 'Pro subscriber';
-      case ProAccessSource.none:
-        return 'Not subscribed';
-    }
-  }
-
   Future<void> _restorePurchases() async {
     setState(() => _isRestoring = true);
     await _subscription.restorePurchases();
@@ -108,7 +91,7 @@ class _MoreScreenState extends State<MoreScreen> {
             if (showSubscriptionSection) ...[
               _SectionHeader(label: 'Subscription'),
               _SubscriptionSection(
-                statusLabel: _proStatusLabel(),
+                statusLabel: _subscription.proStatusLabel,
                 hasPro: _subscription.hasPro,
                 isGrandfathered: _subscription.isGrandfathered,
                 isRestoring: _isRestoring,

@@ -1,6 +1,6 @@
 # PRD: Free Trial for Sent It Pro
 
-> Status: draft
+> Status: draft (product decisions captured 2026-07-27)
 > Author: Research Agent
 > Date: 2026-07-27
 > Source: User request — add free trial support; investigate implementation and real-world best practices
@@ -91,7 +91,7 @@ The paywall redesign already positions annual as the default package with trial-
 | FR-9 | Restore purchases works for trial and post-trial states | must | Existing paywall + More screen restore |
 | FR-10 | Paywall discloses auto-renewal, trial duration, and post-trial price | must | Apple 3.1.2; RC paywall footer + package terms |
 | FR-11 | Privacy Policy and Terms of Use linked on paywall | must | URLs in `subscription_constants.dart` |
-| FR-12 | Optional: show trial status in More screen (e.g., "Trial — ends [date]") | should | Improves transparency; uses `CustomerInfo` period type |
+| FR-12 | Show trial status in More screen (e.g., "Trial — ends [date]") | must | Confirmed in scope; uses `CustomerInfo` period type |
 | FR-13 | Do not ship trial CTA copy until ASC intro offer is live | must | Avoid misleading App Review / users |
 | FR-14 | Sandbox QA with fresh Apple ID for first-time trial eligibility | must | One intro offer per subscription group per Apple ID |
 
@@ -193,7 +193,7 @@ Launch → SubscriptionGate
             → pro entitlement active → App unlocked
 ```
 
-### More screen (optional enhancement)
+### More screen (in scope)
 
 Display subscription status with trial awareness:
 - "Pro subscriber" (paid)
@@ -255,7 +255,7 @@ Per [RevenueCat subscription offers docs](https://www.revenuecat.com/docs/subscr
 | Layer | Trial ready? | Gap |
 |-------|-------------|-----|
 | StoreKit local file | ✅ | Annual has 3-day free intro offer |
-| ASC production | ❌ | Intro offer not confirmed live |
+| ASC production | ❌ | **Confirmed empty** via `asc subscriptions offers introductory list --subscription-id 6794926795` (2026-07-27) |
 | RevenueCat products | ❌ | `trial_duration: null` on annual |
 | RC paywall v1 | ⚠️ | Copy references trial; needs ASC offer + eligibility templates |
 | App code (`SubscriptionService`) | ✅ | Entitlement gate works for trial users |
@@ -290,19 +290,19 @@ Per [RevenueCat subscription offers docs](https://www.revenuecat.com/docs/subscr
 
 | # | Question | Owner | Status |
 |---|----------|-------|--------|
-| 1 | Confirm **3-day** trial duration (vs 7-day)? Paywall copy and StoreKit file assume 3 days. | human | open |
-| 2 | Confirm **annual-only** trial (no monthly trial)? Research recommends annual-only. | human | open |
-| 3 | Has ASC Introductory Offer been created on `sent_it_annual` yet? RC shows `trial_duration: null`. | human | open |
-| 4 | Should More screen show **trial status** ("Trial ends [date]") in v1? | human | open |
-| 5 | Publish paywall trial CTA now or wait until ASC offer verified in sandbox? | human | open |
-| 6 | Future: **promotional offers** for lapsed users who already consumed intro offer? (out of scope but affects long-term retention) | human | open |
-| 7 | Supersede FR-11 in `prd-subscription-and-lifetime.md` explicitly at review time? | human | open |
+| 1 | ~~Confirm **3-day** trial duration?~~ | human | **resolved** — 3 days |
+| 2 | ~~Confirm **annual-only** trial?~~ | human | **resolved** — annual only |
+| 3 | ~~ASC Introductory Offer on `sent_it_annual`?~~ | human | **resolved** — none yet; ASC CLI confirms `introductoryOffers: []` on sub `6794926795` |
+| 4 | ~~Trial status in More screen?~~ | human | **resolved** — yes, in scope |
+| 5 | ~~When to publish paywall trial CTA?~~ | human | **resolved** — after ASC intro offer is created **and** verified in sandbox; paywall copy via RC MCP (`edit-paywall-ai`) then `publish-paywall` with user approval |
+| 6 | ~~Promotional offers for lapsed users?~~ | human | **resolved** — not now |
+| 7 | Terms of Use / EULA creation | human | **open** — owner will create before App Review; interim Apple EULA link exists in `subscription_constants.dart` |
 
 ## Handoff to Planner
 
 ### Suggested Problem Class
 
-`chore` (primarily ASC + RC dashboard configuration; minimal app code) or `feature` if More screen trial status is in scope
+`chore` (ASC + RC dashboard) plus small app change for More screen trial status
 
 ### Suggested Planner Prompt
 
@@ -312,14 +312,17 @@ Per [RevenueCat subscription offers docs](https://www.revenuecat.com/docs/subscr
 Read specs/prd-free-trial.md first.
 
 Scope:
-- App Store Connect: add 3-day free Introductory Offer on sent_it_annual (app 6746167372)
-- Verify ios/SentItProducts.storekit annual intro offer matches ASC (already has P3D free trial)
-- RevenueCat paywall v1 (pwa4f358491d9044ab): ensure eligibility-aware trial CTA on annual package; fallback CTA for ineligible users
-- Do NOT ship trial CTA until ASC offer is live and verified in sandbox
-- No custom app-side trial timers — rely on Apple intro offer + RC entitlement
-- Optional (if approved): trial status in More screen via CustomerInfo period type
-- Do not change subscription_gate.dart gate policy (displayCloseButton: false)
-- Update ai-docs/revenuecat.md with trial configuration notes
+1. ASC: create 3-day free Introductory Offer on sent_it_annual (sub ID 6794926795, app 6746167372)
+   - CLI: asc subscriptions offers introductory import --subscription-id 6794926795 ...
+   - Or ASC dashboard → Introductory Offers tab
+2. Verify ios/SentItProducts.storekit annual intro offer matches ASC (already P3D free trial)
+3. Sandbox QA: fresh Apple ID → trial purchase → pro entitlement → app unlock
+4. RC paywall v1 (pwa4f358491d9044ab): edit via MCP (edit-paywall-ai) — eligibility-aware trial CTA on annual; fallback for ineligible
+5. Publish paywall (publish-paywall) ONLY after ASC offer verified in sandbox + explicit user approval
+6. More screen: show trial status ("Trial — ends [date]") via CustomerInfo period type
+7. No custom app-side trial timers; do not change subscription_gate.dart gate policy
+8. Update ai-docs/revenuecat.md with trial configuration notes
+9. Blocker: owner creating Terms of Use/EULA before App Review (Privacy Policy exists)
 
 Validate: fresh sandbox Apple ID trial purchase → pro entitlement → app unlock; ineligible user sees fallback CTA; grandfathered user bypasses paywall.
 ```

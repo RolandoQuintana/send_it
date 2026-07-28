@@ -177,6 +177,30 @@ Remote paywall **Sent It Paywall: v1** (`pwa4f358491d9044ab`) on offering `defau
 
 **Trial dependency:** CTA trial copy requires a 3-day free intro offer on `sent_it_annual` in ASC. Local simulator testing uses `ios/SentItProducts.storekit` intro offer. Gate: `displayCloseButton: false` in `subscription_gate.dart`.
 
+### Free trial (annual only)
+
+3-day free **Introductory Offer** on `sent_it_annual` via App Store Connect (`THREE_DAYS` / `FREE_TRIAL`). Monthly and lifetime have **no trial**.
+
+| Aspect | Detail |
+|--------|--------|
+| ASC subscription ID | `6794926795` (`sent_it_annual`) |
+| Trial type | Apple Introductory Offer (opt-out; auto-renews to paid annual unless cancelled) |
+| Entitlement | Active `pro` during trial — same as paid; no app-side trial mode |
+| Paywall CTA | Eligibility-aware: eligible → `Start {{ product.offer_period_with_unit }} Free Trial & Continue`; ineligible → `Unlock Unlimited Messaging` |
+| More screen | `periodType == trial` → "Free trial — ends [date]" via `SubscriptionService.proStatusLabel` |
+| Grandfathered users | Bypass paywall; never see trial flow |
+
+**Testing:**
+
+- **StoreKit file** (`ios/SentItProducts.storekit`) — immediate local trial QA without ASC propagation delay
+- **Fresh sandbox Apple ID** — one intro offer per subscription group per Apple ID
+- **Test Store key** (`test_...`, debug builds) — does **not** reflect real ASC intro offers; use StoreKit file or App Store key for trial QA
+- **RC product sync** — `trial_duration` may take up to 24h after ASC config before appearing in RevenueCat
+
+**Publish rule:** Do not publish paywall trial CTA until ASC intro offer is verified in sandbox/TestFlight.
+
+Full product spec: `specs/prd-free-trial.md`
+
 ## RevenueCat MCP (agent setup)
 
 When `plugin-revenuecat-RevenueCat` MCP is available, bootstrap in this order:
@@ -222,4 +246,5 @@ Fresh sandbox account for first-purchase / intro-offer tests.
 ## Related
 
 - `specs/prd-subscription-and-lifetime.md` — product requirements
+- `specs/prd-free-trial.md` — 3-day annual trial configuration and QA
 - RC skills (Cursor): `integrate-revenuecat`, `revenuecat-paywall`, `revenuecat-entitlements-gate`, `revenuecat-purchase-flow`, `revenuecat-testing-setup`, `create-revenuecat-project`

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../constants/diagnostic_constants.dart';
 import '../models/message_group.dart';
 import '../services/group_storage.dart';
 import '../services/shortcut_service.dart';
@@ -311,6 +312,10 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
     }
 
     final hasExtraMedia = _selectedMedia.length > 1;
+    final diagnosticsNote = ShortcutService.isBlastDiagnosticsEnabled
+        ? '\n\nEach send is logged to ${DiagnosticConstants.diagnosticLogFileName} '
+            'in the Files app (created automatically). Share that file with us after.'
+        : '';
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
@@ -319,7 +324,8 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
           'This will automatically send a message to all '
           '${selectedContacts.length} selected contact${selectedContacts.length == 1 ? '' : 's'} '
           'with no confirmation per person.'
-          '${hasExtraMedia ? '\n\nOnly the first attachment will be included — Blast supports 1 media file at a time.' : ''}',
+          '${hasExtraMedia ? '\n\nOnly the first attachment will be included — Blast supports 1 media file at a time.' : ''}'
+          '$diagnosticsNote',
         ),
         actions: [
           CupertinoDialogAction(

@@ -7,28 +7,46 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart' show canLaunchUrl, launchUrl;
 
+import '../constants/diagnostic_constants.dart';
+
 const _channel = MethodChannel('com.sendit/messages');
 
 enum ShortcutLaunchResult { launched, notInstalled, noValidContacts }
 
 class ShortcutService {
-
-  /// Override in debug builds to target the logging shortcut fork:
-  /// `--dart-define=BLAST_SHORTCUT_NAME="Sent It Blast (Debug)"`
-  static const String shortcutName = String.fromEnvironment(
+  static const String _productionShortcutName = 'Sent It Blast';
+  static const String _shortcutNameOverride = String.fromEnvironment(
     'BLAST_SHORTCUT_NAME',
-    defaultValue: 'Sent It Blast',
   );
   static const String _installedKey = 'blast_shortcut_installed';
+  static const String _diagnosticInstalledKey =
+      'blast_diagnostic_shortcut_installed';
+
+  static bool get isBlastDiagnosticsEnabled =>
+      DiagnosticConstants.blastDiagnosticsEnabled;
+
+  /// Shortcut launched by Blast. Diagnostics builds use the diagnostic name
+  /// unless [BLAST_SHORTCUT_NAME] is set (local dev override).
+  static String get shortcutName {
+    if (_shortcutNameOverride.isNotEmpty) return _shortcutNameOverride;
+    if (isBlastDiagnosticsEnabled) {
+      return DiagnosticConstants.diagnosticShortcutName;
+    }
+    return _productionShortcutName;
+  }
 
   static Future<bool> isBlastInstalled() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_installedKey) ?? false;
+    final key =
+        isBlastDiagnosticsEnabled ? _diagnosticInstalledKey : _installedKey;
+    return prefs.getBool(key) ?? false;
   }
 
   static Future<void> markBlastInstalled() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_installedKey, true);
+    final key =
+        isBlastDiagnosticsEnabled ? _diagnosticInstalledKey : _installedKey;
+    await prefs.setBool(key, true);
   }
 
   static String personalizeMessage(String template, Contact contact) {
@@ -75,7 +93,7 @@ class ShortcutService {
   }
 
   /// Builds a personalized JSON payload, copies it to the clipboard, then
-  /// opens the "Sent It Blast" shortcut via the Shortcuts URL scheme.
+  /// opens the Blast shortcut via the Shortcuts URL scheme.
   ///
   /// Payload format (array written to clipboard):
   /// [{"number": "+15551234567", "message": "Hey John, ...", "mediaFile": "blast_media.jpg"}, ...]
@@ -104,7 +122,7 @@ class ShortcutService {
     if (payload.isEmpty) return ShortcutLaunchResult.noValidContacts;
 
     final encoded = jsonEncode(payload);
-    if (kDebugMode) {
+    if (kDebugMode || isBlastDiagnosticsEnabled) {
       debugPrint(
         '[Blast] payload: ${payload.length} recipients, '
         '${encoded.length} UTF-8 bytes, shortcut: $shortcutName',
@@ -127,13 +145,30 @@ class ShortcutService {
     return ShortcutLaunchResult.notInstalled;
   }
 
-  /// Extracts the bundled shortcut file to a temp directory and opens it
-  /// via the system share sheet, which routes it directly to Shortcuts.app.
+  /// Extracts the bundled production shortcut and opens it via the share sheet.
   static Future<void> openInstallPage() async {
-    final data = await rootBundle.load('assets/sent_it_blast.shortcut');
+    await _openBundledShortcut(
+      assetPath: 'assets/sent_it_blast.shortcut',
+      fileName: 'Sent It Blast.shortcut',
+    );
+  }
+
+  /// Extracts the bundled diagnostic shortcut (TestFlight builds only).
+  static Future<void> openDiagnosticInstallPage() async {
+    await _openBundledShortcut(
+      assetPath: DiagnosticConstants.diagnosticShortcutAsset,
+      fileName: '${DiagnosticConstants.diagnosticShortcutName}.shortcut',
+    );
+  }
+
+  static Future<void> _openBundledShortcut({
+    required String assetPath,
+    required String fileName,
+  }) async {
+    final data = await rootBundle.load(assetPath);
     final bytes = data.buffer.asUint8List();
     final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/Sent It Blast.shortcut');
+    final file = File('${tempDir.path}/$fileName');
     await file.writeAsBytes(bytes, flush: true);
     await _channel.invokeMethod('openShortcutFile', {'filePath': file.path});
   }

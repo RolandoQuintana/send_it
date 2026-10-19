@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../constants/diagnostic_constants.dart';
 import '../models/message_group.dart';
+import '../services/blast_feature_service.dart';
 import '../services/group_storage.dart';
 import '../services/shortcut_service.dart';
 import 'edit_group_screen.dart';
@@ -32,6 +33,7 @@ class GroupMessageScreen extends StatefulWidget {
 class _GroupMessageScreenState extends State<GroupMessageScreen> {
   final TextEditingController _messageController = TextEditingController();
   final FocusNode _textFieldFocusNode = FocusNode();
+  final _blastFeature = BlastFeatureService.instance;
   static const platform = MethodChannel('com.sendit/messages');
   late List<Contact> selectedContacts;
   List<File> _selectedMedia = [];
@@ -46,6 +48,11 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
     _messageController.addListener(() {
       setState(() {}); // Rebuild to update send button state
     });
+    _blastFeature.addListener(_onBlastFeatureChanged);
+  }
+
+  void _onBlastFeatureChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _pickMedia() async {
@@ -528,12 +535,14 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
                 });
               },
             ),
-            const SizedBox(width: 16),
-            _buildActionButton(
-              icon: CupertinoIcons.bolt_fill,
-              label: 'Blast',
-              onTap: _sendViaShortcut,
-            ),
+            if (_blastFeature.isEnabled) ...[
+              const SizedBox(width: 16),
+              _buildActionButton(
+                icon: CupertinoIcons.bolt_fill,
+                label: 'Blast',
+                onTap: _sendViaShortcut,
+              ),
+            ],
           ],
         ),
       ),
@@ -1000,6 +1009,7 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
 
   @override
   void dispose() {
+    _blastFeature.removeListener(_onBlastFeatureChanged);
     _messageController.dispose();
     _textFieldFocusNode.dispose();
     super.dispose();

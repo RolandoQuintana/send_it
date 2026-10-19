@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/diagnostic_constants.dart';
 import '../constants/subscription_constants.dart';
+import '../services/blast_feature_service.dart';
 import '../services/subscription_service.dart';
 import '../services/shortcut_service.dart';
 
@@ -15,21 +16,28 @@ class MoreScreen extends StatefulWidget {
 
 class _MoreScreenState extends State<MoreScreen> {
   final _subscription = SubscriptionService.instance;
+  final _blastFeature = BlastFeatureService.instance;
   bool _isRestoring = false;
 
   @override
   void initState() {
     super.initState();
     _subscription.addListener(_onSubscriptionChanged);
+    _blastFeature.addListener(_onBlastFeatureChanged);
   }
 
   @override
   void dispose() {
     _subscription.removeListener(_onSubscriptionChanged);
+    _blastFeature.removeListener(_onBlastFeatureChanged);
     super.dispose();
   }
 
   void _onSubscriptionChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onBlastFeatureChanged() {
     if (mounted) setState(() {});
   }
 
@@ -77,6 +85,40 @@ class _MoreScreenState extends State<MoreScreen> {
     }
   }
 
+  Future<void> _onBlastToggleChanged(bool value) async {
+    if (!value) {
+      await _blastFeature.setEnabled(false);
+      return;
+    }
+
+    if (!_blastFeature.hasAcknowledgedWarning) {
+      final confirmed = await showCupertinoDialog<bool>(
+        context: context,
+        builder: (ctx) => CupertinoAlertDialog(
+          title: const Text('Experimental Feature'),
+          content: const Text(BlastFeatureService.experimentalDisclaimer),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.pop(ctx, false),
+            ),
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              child: const Text('Enable'),
+              onPressed: () => Navigator.pop(ctx, true),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+      await _blastFeature.acknowledgeAndEnable();
+      return;
+    }
+
+    await _blastFeature.setEnabled(true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final showSubscriptionSection = SubscriptionService.isSubscriptionRequired;
@@ -102,11 +144,12 @@ class _MoreScreenState extends State<MoreScreen> {
               ),
               const SizedBox(height: 24),
             ],
-            const _SectionHeader(label: 'Shortcuts'),
-            if (ShortcutService.isBlastDiagnosticsEnabled)
-              _DiagnosticShortcutSection(context)
-            else
-              _ShortcutSection(context),
+            const _SectionHeader(label: 'Experimental'),
+            _ExperimentalBlastSection(
+              parentContext: context,
+              isEnabled: _blastFeature.isEnabled,
+              onEnabledChanged: _onBlastToggleChanged,
+            ),
           ],
         ),
       ),
@@ -207,9 +250,50 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _ShortcutSection extends StatelessWidget {
+class _ExperimentalBlastSection extends StatelessWidget {
+  const _ExperimentalBlastSection({
+    required this.parentContext,
+    required this.isEnabled,
+    required this.onEnabledChanged,
+  });
+
   final BuildContext parentContext;
-  const _ShortcutSection(this.parentContext);
+  final bool isEnabled;
+  final Future<void> Function(bool) onEnabledChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1C1C1E),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ShortcutService.isBlastDiagnosticsEnabled
+          ? _DiagnosticShortcutSection(
+              parentContext,
+              isEnabled: isEnabled,
+              onEnabledChanged: onEnabledChanged,
+            )
+          : _ShortcutSection(
+              parentContext,
+              isEnabled: isEnabled,
+              onEnabledChanged: onEnabledChanged,
+            ),
+    );
+  }
+}
+
+class _ShortcutSection extends StatelessWidget {
+  const _ShortcutSection(
+    this.parentContext, {
+    required this.isEnabled,
+    required this.onEnabledChanged,
+  });
+
+  final BuildContext parentContext;
+  final bool isEnabled;
+  final Future<void> Function(bool) onEnabledChanged;
 
   void _onInstallTapped() {
     showCupertinoDialog(
@@ -240,89 +324,99 @@ class _ShortcutSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return Padding(
+      padding: const EdgeInsets.all(16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isEnabled
+                      ? const Color(0xFF0fa0ab)
+                      : CupertinoColors.systemGrey.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  CupertinoIcons.bolt_fill,
+                  color: isEnabled
+                      ? CupertinoColors.white
+                      : CupertinoColors.systemGrey,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0fa0ab),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        CupertinoIcons.bolt_fill,
+                    Text(
+                      'Sent It Blast',
+                      style: TextStyle(
                         color: CupertinoColors.white,
-                        size: 22,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Sent It Blast',
-                            style: TextStyle(
-                              color: CupertinoColors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            'Apple Shortcut',
-                            style: TextStyle(
-                              color: CupertinoColors.systemGrey,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
+                    Text(
+                      'Apple Shortcut',
+                      style: TextStyle(
+                        color: CupertinoColors.systemGrey,
+                        fontSize: 13,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Send individual messages to your entire group with a single tap — no confirm-per-person required.',
-                  style: TextStyle(
-                    color: CupertinoColors.systemGrey,
-                    fontSize: 14,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _HowItWorksList(),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: CupertinoButton(
-                    color: const Color(0xFF0fa0ab),
-                    borderRadius: BorderRadius.circular(10),
-                    onPressed: _onInstallTapped,
-                    child: const Text(
-                      'Install Shortcut',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: CupertinoColors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
+              CupertinoSwitch(
+                value: isEnabled,
+                activeColor: const Color(0xFF0fa0ab),
+                onChanged: onEnabledChanged,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Send individual messages to your entire group with a single tap — no confirm-per-person required.',
+            style: TextStyle(
+              color: CupertinoColors.systemGrey,
+              fontSize: 14,
+              height: 1.4,
             ),
           ),
+          const SizedBox(height: 12),
+          const Text(
+            BlastFeatureService.experimentalDisclaimer,
+            style: TextStyle(
+              color: CupertinoColors.systemGrey,
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+          if (isEnabled) ...[
+            const SizedBox(height: 20),
+            _HowItWorksList(),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: CupertinoButton(
+                color: const Color(0xFF0fa0ab),
+                borderRadius: BorderRadius.circular(10),
+                onPressed: _onInstallTapped,
+                child: const Text(
+                  'Install Shortcut',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: CupertinoColors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -330,8 +424,15 @@ class _ShortcutSection extends StatelessWidget {
 }
 
 class _DiagnosticShortcutSection extends StatelessWidget {
+  const _DiagnosticShortcutSection(
+    this.parentContext, {
+    required this.isEnabled,
+    required this.onEnabledChanged,
+  });
+
   final BuildContext parentContext;
-  const _DiagnosticShortcutSection(this.parentContext);
+  final bool isEnabled;
+  final Future<void> Function(bool) onEnabledChanged;
 
   void _onInstallTapped() {
     showCupertinoDialog(
@@ -385,68 +486,78 @@ class _DiagnosticShortcutSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: CupertinoColors.systemOrange.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    CupertinoIcons.ant_fill,
-                    color: CupertinoColors.systemOrange,
-                    size: 22,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemOrange.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Diagnostic Blast (TestFlight)',
-                        style: TextStyle(
-                          color: CupertinoColors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        'Logging build',
-                        style: TextStyle(
-                          color: CupertinoColors.systemGrey,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
+                child: const Icon(
+                  CupertinoIcons.ant_fill,
+                  color: CupertinoColors.systemOrange,
+                  size: 22,
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'This build logs each send to ${DiagnosticConstants.diagnosticLogFileName} '
-              '(created automatically in Files). After your blast, search for that file '
-              'in the Files app and share it with us.',
-              style: const TextStyle(
-                color: CupertinoColors.systemGrey,
-                fontSize: 14,
-                height: 1.4,
               ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Diagnostic Blast (TestFlight)',
+                      style: TextStyle(
+                        color: CupertinoColors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Logging build',
+                      style: TextStyle(
+                        color: CupertinoColors.systemGrey,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              CupertinoSwitch(
+                value: isEnabled,
+                activeColor: const Color(0xFF0fa0ab),
+                onChanged: onEnabledChanged,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'This build logs each send to ${DiagnosticConstants.diagnosticLogFileName} '
+            '(created automatically in Files). After your blast, search for that file '
+            'in the Files app and share it with us.',
+            style: const TextStyle(
+              color: CupertinoColors.systemGrey,
+              fontSize: 14,
+              height: 1.4,
             ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            BlastFeatureService.experimentalDisclaimer,
+            style: TextStyle(
+              color: CupertinoColors.systemGrey,
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+          if (isEnabled) ...[
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -479,7 +590,7 @@ class _DiagnosticShortcutSection extends StatelessWidget {
               ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }

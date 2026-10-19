@@ -7,7 +7,7 @@ import '../services/subscription_service.dart';
 ///
 /// Access is determined automatically on launch via [SubscriptionService]:
 /// active `pro` entitlement or grandfathered paid-download receipt.
-/// Restore is available on the paywall and More screen if sync fails.
+/// Restore is available on the paywall if sync fails.
 class SubscriptionGate extends StatefulWidget {
   const SubscriptionGate({super.key, required this.child});
 

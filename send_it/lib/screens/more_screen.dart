@@ -1,8 +1,6 @@
 import 'package:flutter/cupertino.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/diagnostic_constants.dart';
-import '../constants/subscription_constants.dart';
 import '../services/blast_feature_service.dart';
 import '../services/subscription_service.dart';
 import '../services/shortcut_service.dart';
@@ -17,7 +15,6 @@ class MoreScreen extends StatefulWidget {
 class _MoreScreenState extends State<MoreScreen> {
   final _subscription = SubscriptionService.instance;
   final _blastFeature = BlastFeatureService.instance;
-  bool _isRestoring = false;
 
   @override
   void initState() {
@@ -39,50 +36,6 @@ class _MoreScreenState extends State<MoreScreen> {
 
   void _onBlastFeatureChanged() {
     if (mounted) setState(() {});
-  }
-
-  Future<void> _restorePurchases() async {
-    setState(() => _isRestoring = true);
-    await _subscription.restorePurchases();
-    if (!mounted) return;
-    setState(() => _isRestoring = false);
-
-    if (_subscription.hasPro) {
-      await showCupertinoDialog<void>(
-        context: context,
-        builder: (ctx) => CupertinoAlertDialog(
-          title: const Text('Restored'),
-          content: const Text('Your purchases have been restored.'),
-          actions: [
-            CupertinoDialogAction(
-              child: const Text('OK'),
-              onPressed: () => Navigator.pop(ctx),
-            ),
-          ],
-        ),
-      );
-    } else if (_subscription.errorMessage != null) {
-      await showCupertinoDialog<void>(
-        context: context,
-        builder: (ctx) => CupertinoAlertDialog(
-          title: const Text('Restore Failed'),
-          content: Text(_subscription.errorMessage!),
-          actions: [
-            CupertinoDialogAction(
-              child: const Text('OK'),
-              onPressed: () => Navigator.pop(ctx),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
-  Future<void> _openUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
   }
 
   Future<void> _onBlastToggleChanged(bool value) async {
@@ -132,16 +85,8 @@ class _MoreScreenState extends State<MoreScreen> {
           children: [
             const SizedBox(height: 32),
             if (showSubscriptionSection) ...[
-              _SectionHeader(label: 'Subscription'),
-              _SubscriptionSection(
-                statusLabel: _subscription.proStatusLabel,
-                hasPro: _subscription.hasPro,
-                isGrandfathered: _subscription.isGrandfathered,
-                isRestoring: _isRestoring,
-                onRestore: _restorePurchases,
-                onManageSubscription: () => _openUrl(SubscriptionConstants.manageSubscriptionsUrl),
-                onPrivacyPolicy: () => _openUrl(SubscriptionConstants.privacyPolicyUrl),
-              ),
+              _SectionHeader(label: 'Premium'),
+              _SubscriptionSection(hasPro: _subscription.hasPro),
               const SizedBox(height: 24),
             ],
             const _SectionHeader(label: 'Experimental'),
@@ -158,23 +103,9 @@ class _MoreScreenState extends State<MoreScreen> {
 }
 
 class _SubscriptionSection extends StatelessWidget {
-  const _SubscriptionSection({
-    required this.statusLabel,
-    required this.hasPro,
-    required this.isGrandfathered,
-    required this.isRestoring,
-    required this.onRestore,
-    required this.onManageSubscription,
-    required this.onPrivacyPolicy,
-  });
+  const _SubscriptionSection({required this.hasPro});
 
-  final String statusLabel;
   final bool hasPro;
-  final bool isGrandfathered;
-  final bool isRestoring;
-  final VoidCallback onRestore;
-  final VoidCallback onManageSubscription;
-  final VoidCallback onPrivacyPolicy;
 
   @override
   Widget build(BuildContext context) {
@@ -202,26 +133,8 @@ class _SubscriptionSection extends StatelessWidget {
                 size: 18,
               ),
             ),
-            title: const Text('Pro Status'),
-            subtitle: Text(statusLabel),
-          ),
-          if (hasPro && !isGrandfathered)
-            CupertinoListTile(
-              title: const Text('Manage Subscription'),
-              trailing: const CupertinoListTileChevron(),
-              onTap: onManageSubscription,
-            ),
-          CupertinoListTile(
-            title: Text(isRestoring ? 'Restoring...' : 'Restore Purchases'),
-            trailing: isRestoring
-                ? const CupertinoActivityIndicator()
-                : const Icon(CupertinoIcons.arrow_clockwise),
-            onTap: isRestoring ? null : onRestore,
-          ),
-          CupertinoListTile(
-            title: const Text('Privacy Policy'),
-            trailing: const CupertinoListTileChevron(),
-            onTap: onPrivacyPolicy,
+            title: const Text('Premium Active'),
+            subtitle: const Text('You have full access to all features'),
           ),
         ],
       ),

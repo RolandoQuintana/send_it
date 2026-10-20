@@ -17,18 +17,23 @@ class OnboardingService extends ChangeNotifier {
   static const hasUsedFirstMessagePrefillKey =
       'onboarding_has_used_first_message_prefill';
   static const hasCompletedFirstSendKey = 'onboarding_has_completed_first_send';
+  static const hasSeenSendExplainerKey = 'onboarding_has_seen_send_explainer';
 
   bool _initialized = false;
   bool _hasSeenWelcome = false;
   bool _hasCreatedFirstGroup = false;
   bool _hasUsedFirstMessagePrefill = false;
   bool _hasCompletedFirstSend = false;
+  bool _hasSeenSendExplainer = false;
   int? _firstSendCount;
 
   bool get hasSeenWelcome => _hasSeenWelcome;
   bool get hasCreatedFirstGroup => _hasCreatedFirstGroup;
   bool get hasUsedFirstMessagePrefill => _hasUsedFirstMessagePrefill;
   bool get hasCompletedFirstSend => _hasCompletedFirstSend;
+
+  /// Whether the "one message per person" note has been shown before a send.
+  bool get hasSeenSendExplainer => _hasSeenSendExplainer;
 
   /// How many people the first batch reached, set only in the session the
   /// first send happened in (so the paywall can point back to it).
@@ -51,7 +56,9 @@ class OnboardingService extends ChangeNotifier {
       _hasSeenWelcome = true;
       _hasCreatedFirstGroup = true;
       _hasUsedFirstMessagePrefill = true;
+      _hasSeenSendExplainer = true;
       await prefs.setBool(hasSeenWelcomeKey, true);
+      await prefs.setBool(hasSeenSendExplainerKey, true);
       await prefs.setBool(hasCreatedFirstGroupKey, true);
       await prefs.setBool(hasUsedFirstMessagePrefillKey, true);
     } else {
@@ -59,6 +66,7 @@ class OnboardingService extends ChangeNotifier {
       _hasCreatedFirstGroup = prefs.getBool(hasCreatedFirstGroupKey) ?? false;
       _hasUsedFirstMessagePrefill =
           prefs.getBool(hasUsedFirstMessagePrefillKey) ?? false;
+      _hasSeenSendExplainer = prefs.getBool(hasSeenSendExplainerKey) ?? false;
     }
     _hasCompletedFirstSend = prefs.getBool(hasCompletedFirstSendKey) ?? false;
 
@@ -86,6 +94,12 @@ class OnboardingService extends ChangeNotifier {
     _hasUsedFirstMessagePrefill = true;
     await _set(hasUsedFirstMessagePrefillKey);
     return true;
+  }
+
+  Future<void> markSendExplainerSeen() async {
+    if (_hasSeenSendExplainer) return;
+    _hasSeenSendExplainer = true;
+    await _set(hasSeenSendExplainerKey);
   }
 
   /// Records a batch with at least one sent message. Once set, non-Pro

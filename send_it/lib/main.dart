@@ -136,6 +136,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _createNewGroup() async {
+    Future<void>? firstGroupSaved;
+    MessageGroup? firstGroup;
+
     await Navigator.push<MessageGroup>(
       context,
       CupertinoPageRoute(
@@ -143,18 +146,34 @@ class _HomePageState extends State<HomePage> {
           allContacts: allContacts,
           contactsAccess: contactsAccess,
           loadContacts: _loadContacts,
-          onGroupCreated: (group) async {
-            await GroupStorage.addGroup(group);
-            if (await OnboardingService.instance.markFirstGroupCreated()) {
-              AnalyticsService.instance.firstGroupCreated(
-                recipientCount: group.members.length,
-              );
+          onGroupCreated: (group) {
+            final isFirst = !OnboardingService.instance.hasCreatedFirstGroup;
+            final saved = _saveNewGroup(group);
+            if (isFirst) {
+              firstGroup = group;
+              firstGroupSaved = saved;
             }
-            await _loadGroups();
           },
         ),
       ),
     );
+
+    // First group: carry straight on to writing the first message.
+    final group = firstGroup;
+    if (group != null && mounted) {
+      await firstGroupSaved;
+      if (mounted) _openGroup(group);
+    }
+  }
+
+  Future<void> _saveNewGroup(MessageGroup group) async {
+    await GroupStorage.addGroup(group);
+    if (await OnboardingService.instance.markFirstGroupCreated()) {
+      AnalyticsService.instance.firstGroupCreated(
+        recipientCount: group.members.length,
+      );
+    }
+    await _loadGroups();
   }
 
   void _openGroup(MessageGroup group) {

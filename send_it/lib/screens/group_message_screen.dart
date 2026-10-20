@@ -126,6 +126,8 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
       return;
     }
 
+    if (!await _confirmSendLoopOnce() || !mounted) return;
+
     final recipients = List<Contact>.of(selectedContacts);
     final results = <RecipientResult>[];
     var stopped = false;
@@ -259,6 +261,23 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
     // An all-cancelled batch doesn't count: no sheet, no paywall.
     if (summary.sentCount == 0 || !mounted) return;
     await _showResults(summary);
+  }
+
+  /// Before the first send, say that iOS opens one message per person;
+  /// otherwise the second sheet looks like something went wrong.
+  Future<bool> _confirmSendLoopOnce() async {
+    final onboarding = OnboardingService.instance;
+    if (onboarding.hasSeenSendExplainer) return true;
+
+    final confirmed = await showConfirm(
+      context,
+      title: 'One Text per Person',
+      message: "You'll see a message for each person. Tap Send on each "
+          'one, or dismiss it to skip that person.',
+      confirm: 'Start Sending',
+    );
+    if (confirmed) await onboarding.markSendExplainerSeen();
+    return confirmed;
   }
 
   Future<void> _showResults(SendSummary summary) async {

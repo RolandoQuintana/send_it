@@ -30,6 +30,7 @@ void main() {
       expect(service.hasSeenWelcome, isTrue);
       expect(service.hasCreatedFirstGroup, isTrue);
       expect(service.hasUsedFirstMessagePrefill, isTrue);
+      expect(service.hasSeenSendExplainer, isTrue);
       expect(service.hasCompletedFirstSend, isFalse);
     });
 
@@ -44,6 +45,18 @@ void main() {
       await second.initialize();
       expect(second.hasSeenWelcome, isTrue);
       expect(second.hasUsedFirstMessagePrefill, isFalse);
+    });
+
+    test('the send explainer is shown until confirmed once', () async {
+      SharedPreferences.setMockInitialValues({});
+      final service = OnboardingService.forTesting();
+      await service.initialize();
+      expect(service.hasSeenSendExplainer, isFalse);
+
+      await service.markSendExplainerSeen();
+      final relaunched = OnboardingService.forTesting();
+      await relaunched.initialize();
+      expect(relaunched.hasSeenSendExplainer, isTrue);
     });
 
     test('the prefill and first-group flags fire once', () async {

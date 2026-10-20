@@ -12,6 +12,7 @@ import 'screens/more_screen.dart';
 import 'services/blast_feature_service.dart';
 import 'services/group_storage.dart';
 import 'services/subscription_service.dart';
+import 'theme/app_theme.dart';
 import 'widgets/subscription_gate.dart';
 
 Future<void> main() async {
@@ -28,14 +29,9 @@ class SendItApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoApp(
       title: 'Sent It',
-      theme: const CupertinoThemeData(
-        primaryColor: Color(0xFF0fa0ab),
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: CupertinoColors.black,
-        textTheme: CupertinoTextThemeData(
-          textStyle: TextStyle(color: CupertinoColors.white),
-        ),
-      ),
+      // Dark until the Appearance setting (PD-126) lands; screens still
+      // assume a dark background.
+      theme: AppTheme.cupertino(brightness: Brightness.dark),
       home: SubscriptionGate(
         child: UpgradeAlert(
           upgrader: Upgrader(

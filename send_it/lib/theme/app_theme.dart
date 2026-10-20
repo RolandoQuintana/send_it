@@ -41,13 +41,23 @@ abstract final class AppTheme {
         color: l.background.withValues(alpha: 0.92),
         darkColor: d.background.withValues(alpha: 0.92),
       ),
+      // Nav bar transitions lerp between these styles (title → back
+      // label), which asserts unless they agree on `inherit`. Cupertino's
+      // own defaults are non-inheriting, so ours are too.
       textTheme: CupertinoTextThemeData(
         primaryColor: accent,
-        textStyle: AppText.body.copyWith(color: ink),
-        actionTextStyle: AppText.body.copyWith(color: accent),
-        navTitleTextStyle: AppText.headline.copyWith(color: ink),
-        navLargeTitleTextStyle: AppText.largeTitle.copyWith(color: ink),
+        textStyle: _resolved(AppText.body, ink),
+        actionTextStyle: _resolved(AppText.body, accent),
+        navActionTextStyle: _resolved(AppText.body, accent),
+        navTitleTextStyle: _resolved(AppText.headline, ink),
+        navLargeTitleTextStyle: _resolved(AppText.largeTitle, ink),
       ),
     );
   }
+
+  static TextStyle _resolved(TextStyle style, Color color) => style.copyWith(
+        inherit: false,
+        color: color,
+        decoration: TextDecoration.none,
+      );
 }

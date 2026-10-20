@@ -1,9 +1,12 @@
 import 'package:flutter/cupertino.dart';
 
 import '../constants/diagnostic_constants.dart';
+import '../services/appearance_service.dart';
 import '../services/blast_feature_service.dart';
 import '../services/subscription_service.dart';
 import '../services/shortcut_service.dart';
+import '../theme/app_surfaces.dart';
+import '../theme/app_text.dart';
 
 class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
@@ -89,6 +92,9 @@ class _MoreScreenState extends State<MoreScreen> {
               _SubscriptionSection(hasPro: _subscription.hasPro),
               const SizedBox(height: 24),
             ],
+            const _SectionHeader(label: 'Appearance'),
+            const _AppearanceSection(),
+            const SizedBox(height: 24),
             const _SectionHeader(label: 'Experimental'),
             _ExperimentalBlastSection(
               parentContext: context,
@@ -128,8 +134,12 @@ class _SubscriptionSection extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
-                hasPro ? CupertinoIcons.checkmark_seal_fill : CupertinoIcons.lock,
-                color: hasPro ? const Color(0xFF0fa0ab) : CupertinoColors.systemGrey,
+                hasPro
+                    ? CupertinoIcons.checkmark_seal_fill
+                    : CupertinoIcons.lock,
+                color: hasPro
+                    ? const Color(0xFF0fa0ab)
+                    : CupertinoColors.systemGrey,
                 size: 18,
               ),
             ),
@@ -137,6 +147,48 @@ class _SubscriptionSection extends StatelessWidget {
             subtitle: const Text('You have full access to all features'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AppearanceSection extends StatelessWidget {
+  const _AppearanceSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final surfaces = context.surfaces;
+    final appearance = AppearanceService.instance;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ListenableBuilder(
+        listenable: appearance,
+        builder: (context, _) =>
+            CupertinoSlidingSegmentedControl<AppearanceMode>(
+          groupValue: appearance.mode,
+          backgroundColor: surfaces.fill,
+          thumbColor: surfaces.raisedFill,
+          padding: const EdgeInsets.all(3),
+          children: {
+            for (final mode in AppearanceMode.values)
+              mode: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  mode.label,
+                  style: AppText.subhead.copyWith(
+                    color: surfaces.ink,
+                    fontWeight: mode == appearance.mode
+                        ? FontWeight.w600
+                        : FontWeight.w400,
+                  ),
+                ),
+              ),
+          },
+          onValueChanged: (mode) {
+            if (mode != null) appearance.setMode(mode);
+          },
+        ),
       ),
     );
   }
@@ -515,8 +567,14 @@ class _HowItWorksList extends StatelessWidget {
     const steps = [
       (icon: CupertinoIcons.pencil, text: 'Compose your message in Send It'),
       (icon: CupertinoIcons.bolt, text: 'Tap "Blast" in the + menu'),
-      (icon: CupertinoIcons.arrow_right_circle, text: 'The Shortcuts app opens automatically'),
-      (icon: CupertinoIcons.checkmark_circle, text: 'Each contact gets an individual message — no tapping through'),
+      (
+        icon: CupertinoIcons.arrow_right_circle,
+        text: 'The Shortcuts app opens automatically'
+      ),
+      (
+        icon: CupertinoIcons.checkmark_circle,
+        text: 'Each contact gets an individual message — no tapping through'
+      ),
     ];
 
     return Column(

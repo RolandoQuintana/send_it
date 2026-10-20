@@ -9,6 +9,7 @@ import 'models/message_group.dart';
 import 'screens/create_group_screen.dart';
 import 'screens/group_message_screen.dart';
 import 'screens/more_screen.dart';
+import 'services/appearance_service.dart';
 import 'services/blast_feature_service.dart';
 import 'services/group_storage.dart';
 import 'services/subscription_service.dart';
@@ -17,6 +18,8 @@ import 'widgets/subscription_gate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // First: it tells fresh installs from existing users by an empty store.
+  await AppearanceService.instance.initialize();
   await SubscriptionService.instance.initialize();
   await BlastFeatureService.instance.initialize();
   runApp(const SendItApp());
@@ -27,22 +30,25 @@ class SendItApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoApp(
-      title: 'Sent It',
-      // Dark until the Appearance setting (PD-126) lands; screens still
-      // assume a dark background.
-      theme: AppTheme.cupertino(brightness: Brightness.dark),
-      home: SubscriptionGate(
-        child: UpgradeAlert(
-          upgrader: Upgrader(
-            // debugLogging: true, // Set to true for debugging
-            debugDisplayAlways: false,
-          ),
-          dialogStyle: UpgradeDialogStyle.cupertino,
-          child: const HomePage(),
+    return ListenableBuilder(
+      listenable: AppearanceService.instance,
+      builder: (context, _) => CupertinoApp(
+        title: 'Sent It',
+        theme: AppTheme.cupertino(
+          brightness: AppearanceService.instance.mode.brightness,
         ),
+        home: SubscriptionGate(
+          child: UpgradeAlert(
+            upgrader: Upgrader(
+              // debugLogging: true, // Set to true for debugging
+              debugDisplayAlways: false,
+            ),
+            dialogStyle: UpgradeDialogStyle.cupertino,
+            child: const HomePage(),
+          ),
+        ),
+        debugShowCheckedModeBanner: false,
       ),
-      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -92,7 +98,8 @@ class _HomePageState extends State<HomePage> {
           context: context,
           builder: (context) => CupertinoAlertDialog(
             title: const Text('Permission Required'),
-            content: const Text('Contacts permission is required to use this app.'),
+            content:
+                const Text('Contacts permission is required to use this app.'),
             actions: [
               CupertinoDialogAction(
                 child: const Text('OK'),
@@ -253,7 +260,8 @@ class _HomePageState extends State<HomePage> {
                               backgroundColor: const Color(0xFF0fa0ab),
                               child: Text(
                                 group.name[0],
-                                style: const TextStyle(color: CupertinoColors.white),
+                                style: const TextStyle(
+                                    color: CupertinoColors.white),
                               ),
                             ),
                             title: Text(group.name),

@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
 import '../services/subscription_service.dart';
+import '../theme/app_surfaces.dart';
+import '../theme/app_text.dart';
 
 /// Full-app gate: shows RC remote paywall until the user has pro access.
 ///
@@ -54,6 +56,7 @@ class _SubscriptionGateState extends State<SubscriptionGate> {
 
     if (_subscription.errorMessage != null &&
         _subscription.errorMessage!.contains('API key')) {
+      final surfaces = context.surfaces;
       return CupertinoPageScaffold(
         navigationBar: const CupertinoNavigationBar(middle: Text('Sent It')),
         child: SafeArea(
@@ -62,22 +65,22 @@ class _SubscriptionGateState extends State<SubscriptionGate> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  CupertinoIcons.exclamationmark_triangle,
+                Icon(
+                  CupertinoIcons.exclamationmark_triangle_fill,
                   size: 48,
-                  color: CupertinoColors.systemYellow,
+                  color: surfaces.warning,
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Subscription setup required',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  style: AppText.title3.copyWith(color: surfaces.ink),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _subscription.errorMessage!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: CupertinoColors.systemGrey),
+                  style: AppText.subhead.copyWith(color: surfaces.muted),
                 ),
               ],
             ),

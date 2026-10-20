@@ -1,7 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 
+import '../../services/shortcut_service.dart';
 import '../../theme/app_surfaces.dart';
 import '../../theme/app_text.dart';
 
@@ -18,6 +20,7 @@ class MessageComposer extends StatelessWidget {
     required this.onRemoveMedia,
     required this.recipientCount,
     required this.onSend,
+    this.accessory,
   });
 
   final TextEditingController controller;
@@ -31,6 +34,9 @@ class MessageComposer extends StatelessWidget {
   /// Null while there's nothing to send.
   final VoidCallback? onSend;
 
+  /// Shown above the field (the [PersonalizationBar]).
+  final Widget? accessory;
+
   @override
   Widget build(BuildContext context) {
     final surfaces = context.surfaces;
@@ -43,6 +49,7 @@ class MessageComposer extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (accessory != null) accessory!,
           if (media.isNotEmpty)
             SizedBox(
               height: 92,
@@ -517,4 +524,243 @@ class _VariableItem extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Above the field: with `{firstname}` in the message, a live preview of
+/// what the first recipient gets (tap for everyone's); without it, a
+/// one-tap chip that inserts it.
+class PersonalizationBar extends StatelessWidget {
+  const PersonalizationBar({
+    super.key,
+    required this.message,
+    required this.recipients,
+    required this.onInsertFirstName,
+  });
+
+  final String message;
+
+  /// Selected recipients, in list order.
+  final List<Contact> recipients;
+  final VoidCallback onInsertFirstName;
+
+  static const _token = '{firstname}';
+
+  @override
+  Widget build(BuildContext context) {
+    final surfaces = context.surfaces;
+
+    // Without the token everyone gets the same text, so there's nothing
+    // to preview; offer the chip instead.
+    if (!message.contains(_token) || recipients.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+        child: Row(
+          children: [
+            Semantics(
+              button: true,
+              label: 'Insert first name',
+              child: GestureDetector(
+                onTap: onInsertFirstName,
+                child: ExcludeSemantics(
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 32),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: ShapeDecoration(
+                      color: surfaces.accentSoft,
+                      shape: const StadiumBorder(),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          CupertinoIcons.add,
+                          size: 14,
+                          color: surfaces.accent,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'First name',
+                          style: AppText.footnote.copyWith(
+                            color: surfaces.accent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                "Add each person's name",
+                style: AppText.footnote.copyWith(color: surfaces.muted),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final first = recipients.first;
+    final preview = ShortcutService.personalizeMessage(message, first);
+    final name = first.displayName.trim().split(' ').first;
+
+    return Semantics(
+      button: true,
+      label: '$name will get: $preview. Show every message',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => showPersonalizedPreviews(
+          context,
+          message: message,
+          recipients: recipients,
+        ),
+        child: ExcludeSemantics(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 4, 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '$name will get: ',
+                          style: TextStyle(
+                            color: surfaces.ink,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        TextSpan(text: preview),
+                      ],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.footnote.copyWith(color: surfaces.muted),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  recipients.length > 1 ? 'See all' : 'Preview',
+                  style: AppText.footnote.copyWith(
+                    color: surfaces.accent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Every recipient's rendered message, before sending.
+Future<void> showPersonalizedPreviews(
+  BuildContext context, {
+  required String message,
+  required List<Contact> recipients,
+}) {
+  return showCupertinoModalPopup<void>(
+    context: context,
+    builder: (context) {
+      final surfaces = context.surfaces;
+      return Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.75,
+        ),
+        decoration: BoxDecoration(
+          color: surfaces.background,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadii.lg),
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 8, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'What each person gets',
+                        style: AppText.headline.copyWith(color: surfaces.ink),
+                      ),
+                    ),
+                    CupertinoButton(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      minimumSize: const Size(44, 44),
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'Done',
+                        style: AppText.body.copyWith(
+                          color: surfaces.accent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  itemCount: recipients.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final contact = recipients[index];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, bottom: 4),
+                          child: Text(
+                            contact.displayName,
+                            style: AppText.footnote.copyWith(
+                              color: surfaces.muted,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: surfaces.accentFill,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Text(
+                            ShortcutService.personalizeMessage(
+                              message,
+                              contact,
+                            ),
+                            style: AppText.body.copyWith(
+                              color: surfaces.onAccent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }

@@ -29,8 +29,11 @@ class InitialAvatar extends StatelessWidget {
         color: surfaces.accentSoft,
         shape: BoxShape.circle,
       ),
+      // The initial is a glyph sized to its circle, like an icon, so it
+      // doesn't follow Dynamic Type (the name next to it does).
       child: Text(
         initialOf(name),
+        textScaler: TextScaler.noScaling,
         style: AppText.headline.copyWith(
           color: surfaces.accent,
           fontSize: size * 0.42,

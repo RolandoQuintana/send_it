@@ -357,7 +357,9 @@ class _SubmitBar extends StatelessWidget {
                   style: AppText.subhead.copyWith(color: surfaces.muted),
                 ),
               ),
-              PrimaryButton(label: label, onPressed: onPressed),
+              Flexible(
+                child: PrimaryButton(label: label, onPressed: onPressed),
+              ),
             ],
           ),
         ),

@@ -28,7 +28,7 @@ class PrimaryButton extends StatelessWidget {
 
     final button = CupertinoButton(
       onPressed: onPressed,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       minimumSize: const Size(64, 50),
       color: enabled ? surfaces.accentFill : surfaces.fill,
       disabledColor: surfaces.fill,
@@ -40,7 +40,14 @@ class PrimaryButton extends StatelessWidget {
             Icon(icon, size: 20, color: foreground),
             const SizedBox(width: 8),
           ],
-          Text(label, style: AppText.headline.copyWith(color: foreground)),
+          // Flexible so large Dynamic Type wraps instead of overflowing.
+          Flexible(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: AppText.headline.copyWith(color: foreground),
+            ),
+          ),
         ],
       ),
     );

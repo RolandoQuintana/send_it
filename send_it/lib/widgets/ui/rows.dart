@@ -67,7 +67,7 @@ class _TappableRowState extends State<TappableRow> {
                   children: [
                     Text(
                       widget.title,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: AppText.body.copyWith(color: surfaces.ink),
                     ),
@@ -76,7 +76,7 @@ class _TappableRowState extends State<TappableRow> {
                       const SizedBox(height: 2),
                       Text(
                         widget.subtitle!,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: AppText.footnote.copyWith(color: surfaces.muted),
                       ),

@@ -239,6 +239,10 @@ class _SendButton extends StatelessWidget {
                       ),
                       child: Text(
                         '$count',
+                        // Capped so the badge can't cover the button; the
+                        // count is also in the button's semantics label.
+                        textScaler: MediaQuery.textScalerOf(context)
+                            .clamp(maxScaleFactor: 1.3),
                         style: AppText.caption.copyWith(
                           color: surfaces.card,
                           fontWeight: FontWeight.w700,

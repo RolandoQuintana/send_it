@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
+import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
 import '../constants/diagnostic_constants.dart';
+import '../services/analytics_service.dart';
 import '../services/appearance_service.dart';
 import '../services/blast_feature_service.dart';
 import '../services/subscription_service.dart';
@@ -13,14 +15,14 @@ import '../widgets/ui/grouped_section.dart';
 import '../widgets/ui/rows.dart';
 import '../widgets/ui/section_header.dart';
 
-class MoreScreen extends StatefulWidget {
-  const MoreScreen({super.key});
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
 
   @override
-  State<MoreScreen> createState() => _MoreScreenState();
+  State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _MoreScreenState extends State<MoreScreen> {
+class _SettingsScreenState extends State<SettingsScreen> {
   final _subscription = SubscriptionService.instance;
   final _blastFeature = BlastFeatureService.instance;
 
@@ -73,48 +75,70 @@ class _MoreScreenState extends State<MoreScreen> {
     final showSubscriptionSection = SubscriptionService.isSubscriptionRequired;
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('More'),
-      ),
-      child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.only(top: 24, bottom: 40),
-          children: [
-            if (showSubscriptionSection) ...[
-              const SectionHeader('Premium'),
-              _SubscriptionSection(hasPro: _subscription.hasPro),
-              const SizedBox(height: 28),
-            ],
-            const SectionHeader('Appearance'),
-            const _AppearanceSection(),
-            const SizedBox(height: 28),
-            const SectionHeader('Experimental'),
-            GroupedSection(
-              children: [
-                ShortcutService.isBlastDiagnosticsEnabled
-                    ? _DiagnosticShortcutSection(
-                        parentContext: context,
-                        isEnabled: _blastFeature.isEnabled,
-                        onEnabledChanged: _onBlastToggleChanged,
-                      )
-                    : _ShortcutSection(
-                        parentContext: context,
-                        isEnabled: _blastFeature.isEnabled,
-                        onEnabledChanged: _onBlastToggleChanged,
-                      ),
-              ],
+      child: CustomScrollView(
+        slivers: [
+          const CupertinoSliverNavigationBar(
+            largeTitle: Text('Settings'),
+            border: null,
+          ),
+          SliverSafeArea(
+            top: false,
+            sliver: SliverPadding(
+              padding: const EdgeInsets.only(top: 8, bottom: 40),
+              sliver: SliverList.list(
+                children: [
+                  if (showSubscriptionSection) ...[
+                    const SectionHeader('Premium'),
+                    _SubscriptionSection(
+                      hasPro: _subscription.hasPro,
+                      statusLabel: _subscription.proStatusLabel,
+                    ),
+                    const SizedBox(height: 28),
+                  ],
+                  const SectionHeader('Appearance'),
+                  const _AppearanceSection(),
+                  const SizedBox(height: 28),
+                  const SectionHeader('Experimental'),
+                  GroupedSection(
+                    children: [
+                      ShortcutService.isBlastDiagnosticsEnabled
+                          ? _DiagnosticShortcutSection(
+                              parentContext: context,
+                              isEnabled: _blastFeature.isEnabled,
+                              onEnabledChanged: _onBlastToggleChanged,
+                            )
+                          : _ShortcutSection(
+                              parentContext: context,
+                              isEnabled: _blastFeature.isEnabled,
+                              onEnabledChanged: _onBlastToggleChanged,
+                            ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _SubscriptionSection extends StatelessWidget {
-  const _SubscriptionSection({required this.hasPro});
+  const _SubscriptionSection({
+    required this.hasPro,
+    required this.statusLabel,
+  });
 
   final bool hasPro;
+
+  /// e.g. "Pro subscriber" or "Lifetime Pro".
+  final String statusLabel;
+
+  Future<void> _upgrade() async {
+    AnalyticsService.instance.paywallViewed(PaywallTrigger.settings);
+    await RevenueCatUI.presentPaywall(displayCloseButton: true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -122,8 +146,18 @@ class _SubscriptionSection extends StatelessWidget {
     return GroupedSection(
       children: [
         TappableRow(
-          title: 'Premium Active',
-          subtitle: 'You have full access to all features',
+          title: hasPro ? statusLabel : 'Upgrade to Pro',
+          subtitle: hasPro
+              ? 'You have full access to all features'
+              : 'Keep sending personal texts to everyone',
+          trailing: hasPro
+              ? null
+              : Icon(
+                  CupertinoIcons.chevron_forward,
+                  size: 18,
+                  color: surfaces.faint,
+                ),
+          onTap: hasPro ? null : _upgrade,
           leading: IconTile(
             icon: hasPro
                 ? CupertinoIcons.checkmark_seal_fill

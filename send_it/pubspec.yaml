@@ -43,6 +43,8 @@ dependencies:
   upgrader: ^13.1.0
   purchases_flutter: ^10.4.3
   purchases_ui_flutter: ^10.4.3
+  posthog_flutter: ^5.39.0
+  gaimon: ^1.4.2
 
 dev_dependencies:
   flutter_test:

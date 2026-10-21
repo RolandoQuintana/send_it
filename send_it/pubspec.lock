@@ -216,6 +216,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  gaimon:
+    dependency: "direct main"
+    description:
+      name: gaimon
+      sha256: "30633697e071b5fab1b33f1f03e1497156ebd5b92b721f3603c88046339a4af5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.4.2"
   html:
     dependency: transitive
     description:
@@ -544,6 +552,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.2"
+  posthog_flutter:
+    dependency: "direct main"
+    description:
+      name: posthog_flutter
+      sha256: "039d60cbfeefbde8426dca3ffc5fda81b7d1f659a9dc499056d5407fc22d4718"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.55.0"
   purchases_flutter:
     dependency: "direct main"
     description:
@@ -814,5 +830,5 @@ packages:
     source: hosted
     version: "3.1.3"
 sdks:
-  dart: ">=3.8.0-0 <4.0.0"
-  flutter: ">=3.27.0"
+  dart: ">=3.10.0 <4.0.0"
+  flutter: ">=3.38.0"

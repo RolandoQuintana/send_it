@@ -2,21 +2,28 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import 'dart:io';
 import '../constants/diagnostic_constants.dart';
 import '../models/message_group.dart';
+import '../services/analytics_service.dart';
 import '../services/blast_feature_service.dart';
 import '../services/group_storage.dart';
+import '../services/onboarding_service.dart';
 import '../services/shortcut_service.dart';
+import '../services/subscription_service.dart';
 import '../theme/app_surfaces.dart';
 import '../theme/app_text.dart';
+import '../widgets/subscription_gate.dart';
 import '../widgets/ui/buttons.dart';
 import '../widgets/ui/dialogs.dart';
 import '../widgets/ui/rows.dart';
 import '../widgets/ui/section_header.dart';
 import 'edit_group_screen.dart';
 import 'group_message/composer.dart';
-import 'more_screen.dart';
+import 'group_message/send_results_sheet.dart';
+import 'group_message/variable_text_controller.dart';
+import 'settings_screen.dart';
 
 class GroupMessageScreen extends StatefulWidget {
   final MessageGroup group;
@@ -37,7 +44,7 @@ class GroupMessageScreen extends StatefulWidget {
 }
 
 class _GroupMessageScreenState extends State<GroupMessageScreen> {
-  final TextEditingController _messageController = TextEditingController();
+  final _messageController = VariableTextController();
   final FocusNode _textFieldFocusNode = FocusNode();
   final _blastFeature = BlastFeatureService.instance;
   static const platform = MethodChannel('com.sendit/messages');
@@ -55,6 +62,27 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
       setState(() {}); // Rebuild to update send button state
     });
     _blastFeature.addListener(_onBlastFeatureChanged);
+    _maybePrefillFirstMessage();
+  }
+
+  static const _firstMessageSample =
+      'Hey {firstname}! Are you free this weekend?';
+
+  /// The very first compose starts from a sample, all selected so typing
+  /// replaces it.
+  Future<void> _maybePrefillFirstMessage() async {
+    if (!await OnboardingService.instance.consumeFirstMessagePrefill()) {
+      return;
+    }
+    if (!mounted || _messageController.text.isNotEmpty) return;
+    _messageController.value = const TextEditingValue(
+      text: _firstMessageSample,
+      selection: TextSelection(
+        baseOffset: 0,
+        extentOffset: _firstMessageSample.length,
+      ),
+    );
+    _textFieldFocusNode.requestFocus();
   }
 
   void _onBlastFeatureChanged() {
@@ -98,9 +126,23 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
       return;
     }
 
-    for (final contact in selectedContacts) {
+    if (!await _confirmSendLoopOnce() || !mounted) return;
+
+    final recipients = List<Contact>.of(selectedContacts);
+    final results = <RecipientResult>[];
+    var stopped = false;
+
+    for (final (index, contact) in recipients.indexed) {
+      if (stopped) {
+        results.add((name: contact.displayName, outcome: SendOutcome.skipped));
+        continue;
+      }
+
       final phoneNumber = contact.phones.firstOrNull?.number;
-      if (phoneNumber == null) continue;
+      if (phoneNumber == null) {
+        results.add((name: contact.displayName, outcome: SendOutcome.failed));
+        continue;
+      }
 
       // Clean up phone number format
       final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
@@ -108,6 +150,7 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
       final personalizedMessage =
           ShortcutService.personalizeMessage(_messageController.text, contact);
 
+      var outcome = SendOutcome.failed;
       try {
         // Create fresh copies of media files for each message to avoid conflicts
         // Only needed when there are attachments
@@ -131,20 +174,18 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
 
         // Add a delay between message composers to allow proper cleanup and avoid race conditions
         // Only apply delay when there are attachments, as the issue only occurs with attachments
-        if (selectedContacts.indexOf(contact) > 0 &&
-            _selectedMedia.isNotEmpty) {
+        if (index > 0 && _selectedMedia.isNotEmpty) {
           await Future.delayed(const Duration(milliseconds: 800));
         }
 
         final result = await platform.invokeMethod('sendMessage', args);
 
         if (result == "sent") {
-          // Message was sent successfully, continue to next contact
-          continue;
+          outcome = SendOutcome.sent;
         } else if (result == "cancelled") {
+          outcome = SendOutcome.skipped;
           // User cancelled, ask if they want to continue with remaining messages
-          final remainingCount =
-              selectedContacts.length - selectedContacts.indexOf(contact) - 1;
+          final remainingCount = recipients.length - index - 1;
           if (remainingCount > 0 && mounted) {
             final shouldContinue = await showCupertinoDialog<bool>(
               context: context,
@@ -167,13 +208,9 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
               ),
             );
 
-            if (shouldContinue != true) {
-              // User chose to stop sending
-              break;
-            }
+            // The rest are recorded as skipped.
+            if (shouldContinue != true) stopped = true;
           }
-          // If user chose to continue or there are no more recipients, continue to next contact
-          continue;
         }
       } on PlatformException catch (e) {
         debugPrint('Platform Exception: ${e.code} - ${e.message}');
@@ -190,16 +227,22 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
           showNotice(context, title: 'Something Went Wrong', message: '$e');
         }
       }
+      results.add((name: contact.displayName, outcome: outcome));
     }
+
+    final summary = SendSummary(results);
 
     // Remember if there were attachments before clearing
     final hadAttachments = _selectedMedia.isNotEmpty;
 
-    // Clear the message and media after sending
-    setState(() {
-      _messageController.clear();
-      _selectedMedia.clear();
-    });
+    // Clear the message and media once something went out; if nothing did,
+    // keep them so the user can retry.
+    if (summary.sentCount > 0 && mounted) {
+      setState(() {
+        _messageController.clear();
+        _selectedMedia.clear();
+      });
+    }
 
     // Clean up any fresh media files that may have been created (only when there were attachments)
     if (hadAttachments) {
@@ -214,9 +257,77 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
         // Ignore cleanup errors
       }
     }
+
+    // An all-cancelled batch doesn't count: no sheet, no paywall.
+    if (summary.sentCount == 0 || !mounted) return;
+    await _showResults(summary);
+  }
+
+  /// Before the first send, say that iOS opens one message per person;
+  /// otherwise the second sheet looks like something went wrong.
+  Future<bool> _confirmSendLoopOnce() async {
+    final onboarding = OnboardingService.instance;
+    if (onboarding.hasSeenSendExplainer) return true;
+
+    final confirmed = await showConfirm(
+      context,
+      title: 'One Text per Person',
+      message: "You'll see a message for each person. Tap Send on each "
+          'one, or dismiss it to skip that person.',
+      confirm: 'Start Sending',
+    );
+    if (confirmed) await onboarding.markSendExplainerSeen();
+    return confirmed;
+  }
+
+  Future<void> _showResults(SendSummary summary) async {
+    final onboarding = OnboardingService.instance;
+    final firstSend = !onboarding.hasCompletedFirstSend;
+    if (firstSend) {
+      AnalyticsService.instance.firstSendCompleted(
+        sent: summary.sentCount,
+        cancelled: summary.skippedCount,
+        failed: summary.failedCount,
+      );
+    }
+
+    final paywallNext = SubscriptionGate.isLocked(
+      subscriptionRequired: SubscriptionService.isSubscriptionRequired,
+      hasPro: SubscriptionService.instance.hasPro,
+      hasCompletedFirstSend: true,
+    );
+    if (paywallNext) {
+      await onboarding.markFirstSendCompleted(sentCount: summary.sentCount);
+    }
+    if (!mounted) return;
+
+    await showSendResults(
+      context,
+      summary: summary,
+      continueLabel: paywallNext ? 'Keep Sending' : null,
+    );
+
+    if (paywallNext && mounted) {
+      // Back to the root, which the gate now swaps for the paywall.
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      onboarding.presentPaywall();
+    }
+  }
+
+  /// Blast sends can't be observed, so they never count as the free first
+  /// send: they need Pro up front.
+  Future<bool> _ensureProForBlast() async {
+    final subscription = SubscriptionService.instance;
+    if (subscription.hasPro) return true;
+
+    AnalyticsService.instance.paywallViewed(PaywallTrigger.blast);
+    await RevenueCatUI.presentPaywall(displayCloseButton: true);
+    return subscription.hasPro;
   }
 
   Future<void> _sendViaShortcut() async {
+    if (!await _ensureProForBlast() || !mounted) return;
+
     if (_messageController.text.trim().isEmpty) {
       showNotice(
         context,
@@ -260,7 +371,7 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
                 Navigator.pop(ctx);
                 Navigator.push(
                   context,
-                  CupertinoPageRoute(builder: (_) => const MoreScreen()),
+                  CupertinoPageRoute(builder: (_) => const SettingsScreen()),
                 );
               },
             ),
@@ -578,6 +689,16 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
                           setState(() => _selectedMedia.removeAt(index)),
                       recipientCount: selectedContacts.length,
                       onSend: canSend ? _sendMessages : null,
+                      accessory: PersonalizationBar(
+                        message: _messageController.text,
+                        recipients: [
+                          for (final contact in members)
+                            if (selectedContacts.contains(contact)) contact,
+                        ],
+                        onInsertFirstName: () => _insertVariable(
+                          VariableTextController.firstName,
+                        ),
+                      ),
                     ),
                     _buildAccessorySlot(),
                   ],

@@ -4,13 +4,18 @@ import 'package:upgrader/upgrader.dart';
 import 'models/message_group.dart';
 import 'screens/create_group_screen.dart';
 import 'screens/group_message_screen.dart';
-import 'screens/more_screen.dart';
+import 'screens/root_tabs.dart';
+import 'screens/welcome_screen.dart';
+import 'services/analytics_service.dart';
 import 'services/appearance_service.dart';
 import 'services/blast_feature_service.dart';
+import 'services/contacts_access_service.dart';
 import 'services/group_storage.dart';
+import 'services/onboarding_service.dart';
 import 'services/subscription_service.dart';
 import 'theme/app_surfaces.dart';
 import 'theme/app_theme.dart';
+import 'widgets/group_form_screen.dart';
 import 'widgets/subscription_gate.dart';
 import 'widgets/ui/avatar.dart';
 import 'widgets/ui/buttons.dart';
@@ -22,8 +27,11 @@ import 'widgets/ui/section_header.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // First: it tells fresh installs from existing users by an empty store.
+  // These two tell fresh installs from existing users by an empty store,
+  // so they run before anything else touches it.
+  await OnboardingService.instance.initialize();
   await AppearanceService.instance.initialize();
+  await AnalyticsService.instance.initialize();
   await SubscriptionService.instance.initialize();
   await BlastFeatureService.instance.initialize();
   runApp(const SendItApp());
@@ -42,13 +50,15 @@ class SendItApp extends StatelessWidget {
           brightness: AppearanceService.instance.mode.brightness,
         ),
         home: SubscriptionGate(
-          child: UpgradeAlert(
-            upgrader: Upgrader(
-              // debugLogging: true, // Set to true for debugging
-              debugDisplayAlways: false,
+          child: WelcomeGate(
+            child: UpgradeAlert(
+              upgrader: Upgrader(
+                // debugLogging: true, // Set to true for debugging
+                debugDisplayAlways: false,
+              ),
+              dialogStyle: UpgradeDialogStyle.cupertino,
+              child: const RootTabs(),
             ),
-            dialogStyle: UpgradeDialogStyle.cupertino,
-            child: const HomePage(),
           ),
         ),
         debugShowCheckedModeBanner: false,
@@ -66,52 +76,55 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   List<Contact> allContacts = [];
-  bool isLoading = false;
+  ContactsAccess contactsAccess = ContactsAccess.notDetermined;
+  bool isLoading = true;
   List<MessageGroup> groups = [];
 
   @override
   void initState() {
     super.initState();
-    _requestContactsPermission();
+    _initialLoad();
   }
 
-  Future<void> _requestContactsPermission() async {
-    final granted = await FlutterContacts.requestPermission();
-    if (granted) {
-      await _loadContacts();
-    } else if (mounted) {
-      showNotice(
-        context,
-        title: 'Contacts Access Needed',
-        message: 'Sent It builds groups from your contacts. '
-            'Allow access in Settings → Sent It → Contacts.',
-      );
-    }
+  /// Never prompts for Contacts here: the group form asks, after explaining
+  /// why. Groups still load without access (members just can't resolve).
+  Future<void> _initialLoad() async {
+    await _loadContacts(request: false);
+    await _loadGroups();
+    if (mounted) setState(() => isLoading = false);
   }
 
-  Future<void> _loadContacts() async {
-    setState(() => isLoading = true);
-    try {
-      final contacts = await FlutterContacts.getContacts(
-        withProperties: true,
-        withPhoto: true,
-      );
-      setState(() {
-        allContacts = contacts;
-        isLoading = false;
-      });
-      await _loadGroups();
-    } catch (e) {
-      setState(() => isLoading = false);
-      if (mounted) {
-        showNotice(context, title: "Couldn't Load Contacts", message: '$e');
+  Future<ContactsLoad> _loadContacts({required bool request}) async {
+    final access = request
+        ? await ContactsAccessService.request()
+        : await ContactsAccessService.status();
+    var contacts = <Contact>[];
+    if (access.canRead) {
+      try {
+        contacts = await ContactsAccessService.load();
+      } catch (e) {
+        if (mounted) {
+          showNotice(context, title: "Couldn't Load Contacts", message: '$e');
+        }
       }
     }
+    final contactsChanged = contacts.length != allContacts.length;
+    if (mounted) {
+      setState(() {
+        contactsAccess = access;
+        allContacts = contacts;
+      });
+    }
+    GroupStorage.setContacts(contacts);
+    // Members are matched to contacts, so reload groups when they change.
+    if (contactsChanged && !isLoading) await _loadGroups();
+    return (access: access, contacts: contacts);
   }
 
   Future<void> _loadGroups() async {
     try {
       final loadedGroups = await GroupStorage.loadGroups(allContacts);
+      if (!mounted) return;
       setState(() {
         groups = loadedGroups;
       });
@@ -123,23 +136,48 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _createNewGroup() async {
-    await Navigator.push<MessageGroup>(
-      context,
+    Future<void>? firstGroupSaved;
+    MessageGroup? firstGroup;
+
+    // Root navigator: detail screens cover the tab bar.
+    await Navigator.of(context, rootNavigator: true).push<MessageGroup>(
       CupertinoPageRoute(
         builder: (context) => CreateGroupScreen(
           allContacts: allContacts,
-          onGroupCreated: (group) async {
-            await GroupStorage.addGroup(group);
-            await _loadGroups();
+          contactsAccess: contactsAccess,
+          loadContacts: _loadContacts,
+          onGroupCreated: (group) {
+            final isFirst = !OnboardingService.instance.hasCreatedFirstGroup;
+            final saved = _saveNewGroup(group);
+            if (isFirst) {
+              firstGroup = group;
+              firstGroupSaved = saved;
+            }
           },
         ),
       ),
     );
+
+    // First group: carry straight on to writing the first message.
+    final group = firstGroup;
+    if (group != null && mounted) {
+      await firstGroupSaved;
+      if (mounted) _openGroup(group);
+    }
+  }
+
+  Future<void> _saveNewGroup(MessageGroup group) async {
+    await GroupStorage.addGroup(group);
+    if (await OnboardingService.instance.markFirstGroupCreated()) {
+      AnalyticsService.instance.firstGroupCreated(
+        recipientCount: group.members.length,
+      );
+    }
+    await _loadGroups();
   }
 
   void _openGroup(MessageGroup group) {
-    Navigator.push(
-      context,
+    Navigator.of(context, rootNavigator: true).push(
       CupertinoPageRoute(
         builder: (context) => GroupMessageScreen(
           group: group,
@@ -171,17 +209,9 @@ class _HomePageState extends State<HomePage> {
         children: [
           CustomScrollView(
             slivers: [
-              CupertinoSliverNavigationBar(
-                largeTitle: const Text('Sent It'),
+              const CupertinoSliverNavigationBar(
+                largeTitle: Text('Sent It'),
                 border: null,
-                trailing: NavIconButton(
-                  icon: CupertinoIcons.ellipsis_circle,
-                  semanticLabel: 'More',
-                  onPressed: () => Navigator.push(
-                    context,
-                    CupertinoPageRoute(builder: (_) => const MoreScreen()),
-                  ),
-                ),
               ),
               if (isLoading)
                 const SliverFillRemaining(
@@ -193,11 +223,12 @@ class _HomePageState extends State<HomePage> {
                   hasScrollBody: false,
                   child: EmptyState(
                     icon: CupertinoIcons.person_3_fill,
-                    title: 'No groups yet',
-                    message: 'Make a group of contacts, then send each of '
-                        'them a personal message in one go.',
+                    title: 'Start with a group',
+                    message: 'A group is the people you text together, '
+                        'like family or your team. Each of them gets '
+                        'their own message.',
                     action: PrimaryButton(
-                      label: 'Create Group',
+                      label: 'Create Your First Group',
                       icon: CupertinoIcons.add,
                       onPressed: _createNewGroup,
                     ),

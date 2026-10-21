@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../services/haptics.dart';
 import '../../theme/app_surfaces.dart';
 import '../../theme/app_text.dart';
 import '../../widgets/ui/avatar.dart';
@@ -57,7 +58,9 @@ Future<void> showSendResults(
   );
 }
 
-class SendResultsSheet extends StatelessWidget {
+/// Opens with a success haptic; each recipient's status pops in down the
+/// list (skipped with Reduce Motion).
+class SendResultsSheet extends StatefulWidget {
   const SendResultsSheet({
     super.key,
     required this.summary,
@@ -72,7 +75,63 @@ class SendResultsSheet extends StatelessWidget {
   final bool dismissible;
 
   @override
+  State<SendResultsSheet> createState() => _SendResultsSheetState();
+}
+
+class _SendResultsSheetState extends State<SendResultsSheet>
+    with SingleTickerProviderStateMixin {
+  static const _popMs = 300;
+
+  /// Gap between rows: 60ms, squeezed so big groups finish within ~1s.
+  late final int _staggerMs = widget.summary.results.length <= 1
+      ? 0
+      : (700 / (widget.summary.results.length - 1)).clamp(0, 60).round();
+
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: Duration(
+      milliseconds: _popMs +
+          _staggerMs * (widget.summary.results.length - 1).clamp(0, 99999),
+    ),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    Haptics.success();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_controller.isDismissed) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = 1;
+    } else {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Animation<double> _rowAnimation(int index) {
+    final total = _controller.duration!.inMilliseconds;
+    final begin = index * _staggerMs / total;
+    final end = (index * _staggerMs + _popMs) / total;
+    return CurvedAnimation(
+      parent: _controller,
+      curve: Interval(begin.clamp(0, 1), end.clamp(0, 1)),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final summary = widget.summary;
+    final buttonLabel = widget.buttonLabel;
     final surfaces = context.surfaces;
     final notSent = [
       if (summary.skippedCount > 0) '${summary.skippedCount} skipped',
@@ -80,7 +139,7 @@ class SendResultsSheet extends StatelessWidget {
     ];
 
     return PopScope(
-      canPop: dismissible,
+      canPop: widget.dismissible,
       child: Container(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(context).height * 0.85,
@@ -127,8 +186,10 @@ class SendResultsSheet extends StatelessWidget {
                       padding: const EdgeInsets.only(left: 64),
                       child: Container(height: 0.5, color: surfaces.hairline),
                     ),
-                    itemBuilder: (context, index) =>
-                        _ResultRow(result: summary.results[index]),
+                    itemBuilder: (context, index) => _ResultRow(
+                      result: summary.results[index],
+                      appear: _rowAnimation(index),
+                    ),
                   ),
                 ),
               ),
@@ -149,9 +210,12 @@ class SendResultsSheet extends StatelessWidget {
 }
 
 class _ResultRow extends StatelessWidget {
-  const _ResultRow({required this.result});
+  const _ResultRow({required this.result, required this.appear});
 
   final RecipientResult result;
+
+  /// 0→1 as the status pops in.
+  final Animation<double> appear;
 
   @override
   Widget build(BuildContext context) {
@@ -188,13 +252,27 @@ class _ResultRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(icon, size: 18, color: color),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: AppText.footnote.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
+            FadeTransition(
+              opacity: appear,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ScaleTransition(
+                    scale: CurvedAnimation(
+                      parent: appear,
+                      curve: Curves.easeOutBack,
+                    ),
+                    child: Icon(icon, size: 18, color: color),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: AppText.footnote.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

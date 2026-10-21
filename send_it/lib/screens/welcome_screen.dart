@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../services/analytics_service.dart';
+import '../services/haptics.dart';
 import '../services/onboarding_service.dart';
 import '../services/subscription_service.dart';
 import '../theme/app_surfaces.dart';
@@ -143,12 +144,71 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 }
 
-/// What you write once, fanning out into three separate threads.
-class _FanOutIllustration extends StatelessWidget {
+/// What you write once, fanning out into three separate threads. On first
+/// show the threads drop in one by one (skipped with Reduce Motion).
+class _FanOutIllustration extends StatefulWidget {
   const _FanOutIllustration();
 
+  @override
+  State<_FanOutIllustration> createState() => _FanOutIllustrationState();
+}
+
+class _FanOutIllustrationState extends State<_FanOutIllustration>
+    with SingleTickerProviderStateMixin {
   static const _message = 'Dinner Friday?';
   static const _names = ['Sam', 'Priya', 'Leo'];
+
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_controller.isDismissed) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = 1;
+    } else {
+      _controller.forward().then((_) {
+        if (mounted) Haptics.primary();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// Fades and slides [child] in over [begin]–[end] of the timeline.
+  Widget _reveal({
+    required double begin,
+    required double end,
+    required Widget child,
+    Offset from = const Offset(0, -0.25),
+    double scaleFrom = 1,
+  }) {
+    final curve = CurvedAnimation(
+      parent: _controller,
+      curve: Interval(begin, end, curve: Curves.easeOutBack),
+    );
+    final fade = CurvedAnimation(
+      parent: _controller,
+      curve: Interval(begin, end, curve: Curves.easeOut),
+    );
+    return FadeTransition(
+      opacity: fade,
+      child: SlideTransition(
+        position: Tween(begin: from, end: Offset.zero).animate(curve),
+        child: ScaleTransition(
+          scale: Tween(begin: scaleFrom, end: 1.0).animate(curve),
+          child: child,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -171,18 +231,27 @@ class _FanOutIllustration extends StatelessWidget {
       ),
     );
 
-    Widget thread(String name) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            children: [
-              InitialAvatar(name, size: 32),
-              const SizedBox(width: 8),
-              // Centered on the card: the trailing gap mirrors the avatar.
-              Expanded(
-                child: Align(
+    Widget thread(int i, String name) {
+      final start = 0.35 + i * 0.17;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          children: [
+            InitialAvatar(name, size: 32),
+            const SizedBox(width: 8),
+            // Centered on the card: the trailing gap mirrors the avatar.
+            Expanded(
+              child: Align(
+                child: _reveal(
+                  begin: start,
+                  end: start + 0.3,
+                  from: const Offset(0, -0.6),
+                  scaleFrom: 0.85,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
                     decoration: BoxDecoration(
                       color: surfaces.accentFill,
                       borderRadius: BorderRadius.circular(16),
@@ -194,10 +263,12 @@ class _FanOutIllustration extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8 + 32),
-            ],
-          ),
-        );
+            ),
+            const SizedBox(width: 8 + 32),
+          ],
+        ),
+      );
+    }
 
     return ExcludeSemantics(
       child: Column(
@@ -228,7 +299,15 @@ class _FanOutIllustration extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Icon(CupertinoIcons.arrow_down, color: surfaces.faint, size: 20),
+          _reveal(
+            begin: 0.1,
+            end: 0.35,
+            child: Icon(
+              CupertinoIcons.arrow_down,
+              color: surfaces.faint,
+              size: 20,
+            ),
+          ),
           const SizedBox(height: 10),
           Container(
             decoration: surfaces.cardDecoration(),
@@ -240,7 +319,7 @@ class _FanOutIllustration extends StatelessWidget {
                       padding: const EdgeInsets.only(left: 56),
                       child: Container(height: 0.5, color: surfaces.hairline),
                     ),
-                  thread(name),
+                  thread(i, name),
                 ],
               ],
             ),

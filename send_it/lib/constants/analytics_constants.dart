@@ -10,4 +10,9 @@ class AnalyticsConstants {
   );
 
   static const postHogHost = 'https://us.i.posthog.com';
+
+  /// Debug builds stay out of PostHog. Flip to true (or pass
+  /// `--dart-define=POSTHOG_IN_DEBUG=true`) to test events locally.
+  static const enablePostHogInDebug =
+      bool.fromEnvironment('POSTHOG_IN_DEBUG');
 }

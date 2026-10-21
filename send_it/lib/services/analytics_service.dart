@@ -19,8 +19,15 @@ class AnalyticsService {
 
   bool _enabled = false;
 
+  /// Skipped in debug builds unless [AnalyticsConstants.enablePostHogInDebug]
+  /// is on, so development never lands in the shared project.
   Future<void> initialize() async {
     if (_enabled || !Platform.isIOS) return;
+    if (kDebugMode && !AnalyticsConstants.enablePostHogInDebug) {
+      debugPrint('[AnalyticsService] PostHog skipped (debug build). '
+          'Run with --dart-define=POSTHOG_IN_DEBUG=true to enable.');
+      return;
+    }
     const apiKey = AnalyticsConstants.postHogApiKey;
     if (apiKey.isEmpty) return;
 

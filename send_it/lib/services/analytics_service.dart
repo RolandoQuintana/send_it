@@ -6,7 +6,7 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import '../constants/analytics_constants.dart';
 
 /// Where a paywall was shown from, for `paywall_viewed`.
-enum PaywallTrigger { firstSend, launch, blast, settings }
+enum PaywallTrigger { send, launch, blast, settings }
 
 /// Onboarding + paywall funnel events (PostHog).
 ///
@@ -46,6 +46,20 @@ class AnalyticsService {
 
   void firstGroupCreated({required int recipientCount}) =>
       _capture('first_group_created', {'recipient_count': recipientCount});
+
+  /// Every valid Send tap (message and recipients present), Pro or not.
+  void sendTapped({
+    required int recipientCount,
+    required bool hasMedia,
+    required bool isFirstSend,
+    required bool hasPro,
+  }) =>
+      _capture('send_tapped', {
+        'recipient_count': recipientCount,
+        'has_media': hasMedia,
+        'is_first_send': isFirstSend,
+        'has_pro': hasPro,
+      });
 
   void firstSendCompleted({
     required int sent,

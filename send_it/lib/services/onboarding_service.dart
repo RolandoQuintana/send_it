@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// First-run progress: the welcome screen, the first group, the first
-/// prefilled message and the first successful send (which turns on the
-/// hard paywall for non-Pro users).
+/// prefilled message and the first successful send (after which the launch
+/// gate applies whenever the user isn't Pro).
 class OnboardingService extends ChangeNotifier {
   OnboardingService._();
 
@@ -25,7 +25,6 @@ class OnboardingService extends ChangeNotifier {
   bool _hasUsedFirstMessagePrefill = false;
   bool _hasCompletedFirstSend = false;
   bool _hasSeenSendExplainer = false;
-  int? _firstSendCount;
 
   bool get hasSeenWelcome => _hasSeenWelcome;
   bool get hasCreatedFirstGroup => _hasCreatedFirstGroup;
@@ -34,10 +33,6 @@ class OnboardingService extends ChangeNotifier {
 
   /// Whether the "one message per person" note has been shown before a send.
   bool get hasSeenSendExplainer => _hasSeenSendExplainer;
-
-  /// How many people the first batch reached, set only in the session the
-  /// first send happened in (so the paywall can point back to it).
-  int? get firstSendCount => _firstSendCount;
 
   /// Call before [AppearanceService.initialize]: an empty store is how a
   /// fresh install is told apart from an existing user. Only an existing
@@ -102,19 +97,14 @@ class OnboardingService extends ChangeNotifier {
     await _set(hasSeenSendExplainerKey);
   }
 
-  /// Records a batch with at least one sent message. Once set, non-Pro
-  /// users are gated on every launch. Saved right away (so killing the app
-  /// on the success sheet doesn't skip the paywall), but listeners hear
-  /// about it from [presentPaywall], after the success sheet.
-  Future<void> markFirstSendCompleted({required int sentCount}) async {
+  /// Records a batch with at least one sent message. Once set, the launch
+  /// gate locks the app whenever the user isn't Pro (e.g. a lapsed trial).
+  Future<void> markFirstSendCompleted() async {
     if (_hasCompletedFirstSend) return;
     _hasCompletedFirstSend = true;
-    _firstSendCount = sentCount;
+    notifyListeners();
     await _set(hasCompletedFirstSendKey);
   }
-
-  /// Lets [SubscriptionGate] swap the app for the paywall.
-  void presentPaywall() => notifyListeners();
 
   Future<void> _set(String key) async {
     final prefs = await SharedPreferences.getInstance();

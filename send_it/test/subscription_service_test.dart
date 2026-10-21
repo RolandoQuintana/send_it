@@ -8,13 +8,13 @@ void main() {
 
   CustomerInfo buildInfo({String? originalPurchaseDate}) {
     return CustomerInfo.fromJson({
-      'entitlements': {
+      'entitlements': const {
         'all': <String, dynamic>{},
         'active': <String, dynamic>{},
         'verification': 'NOT_REQUESTED',
       },
-      'activeSubscriptions': <String>[],
-      'allPurchasedProductIdentifiers': <String>[],
+      'activeSubscriptions': const <String>[],
+      'allPurchasedProductIdentifiers': const <String>[],
       'latestExpirationDate': null,
       'firstSeen': '2026-01-01T00:00:00Z',
       'originalAppUserId': 'test-user',
@@ -22,10 +22,10 @@ void main() {
       'originalPurchaseDate': originalPurchaseDate,
       'originalApplicationVersion': '1',
       'managementURL': null,
-      'allExpirationDates': <String, dynamic>{},
-      'allPurchaseDates': <String, dynamic>{},
-      'nonSubscriptionTransactions': <Map<String, dynamic>>[],
-      'subscriptionsByProductIdentifier': <String, dynamic>{},
+      'allExpirationDates': const <String, dynamic>{},
+      'allPurchaseDates': const <String, dynamic>{},
+      'nonSubscriptionTransactions': const <Map<String, dynamic>>[],
+      'subscriptionsByProductIdentifier': const <String, dynamic>{},
     });
   }
 

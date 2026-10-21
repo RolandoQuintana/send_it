@@ -7,9 +7,9 @@ import '../services/subscription_service.dart';
 import '../theme/app_surfaces.dart';
 import '../theme/app_text.dart';
 
-/// Full-app gate: shows the RC remote paywall once a non-Pro user has
-/// completed their first send. Before that, the app is free to use so the
-/// first batch can go out.
+/// Full-app launch gate. Non-Pro users pay at their first Send tap (see
+/// [needsPaywallToSend]); this catches anyone who has sent before but lost
+/// Pro: a lapsed trial or subscription, or a free send under an older build.
 ///
 /// Access is determined automatically on launch via [SubscriptionService]:
 /// active `pro` entitlement or grandfathered paid-download receipt.
@@ -26,6 +26,13 @@ class SubscriptionGate extends StatefulWidget {
     required bool hasCompletedFirstSend,
   }) =>
       subscriptionRequired && !hasPro && hasCompletedFirstSend;
+
+  /// Whether tapping Send must show the paywall first.
+  static bool needsPaywallToSend({
+    required bool subscriptionRequired,
+    required bool hasPro,
+  }) =>
+      subscriptionRequired && !hasPro;
 
   @override
   State<SubscriptionGate> createState() => _SubscriptionGateState();
@@ -111,17 +118,12 @@ class _SubscriptionGateState extends State<SubscriptionGate> {
       );
     }
 
-    final firstSendCount = _onboarding.firstSendCount;
     if (!_loggedPaywallView) {
       _loggedPaywallView = true;
-      AnalyticsService.instance.paywallViewed(
-        firstSendCount != null
-            ? PaywallTrigger.firstSend
-            : PaywallTrigger.launch,
-      );
+      AnalyticsService.instance.paywallViewed(PaywallTrigger.launch);
     }
 
-    final paywall = PaywallView(
+    return PaywallView(
       displayCloseButton: false,
       onPurchaseCompleted: (_, transaction) {
         AnalyticsService.instance
@@ -136,59 +138,6 @@ class _SubscriptionGateState extends State<SubscriptionGate> {
         if (mounted) setState(() {});
       },
       onDismiss: () {},
-    );
-
-    if (firstSendCount == null) return paywall;
-
-    // Right after the first batch: point back to what they just did.
-    return CupertinoPageScaffold(
-      child: Column(
-        children: [
-          _FirstSendBanner(sentCount: firstSendCount),
-          Expanded(child: paywall),
-        ],
-      ),
-    );
-  }
-}
-
-class _FirstSendBanner extends StatelessWidget {
-  const _FirstSendBanner({required this.sentCount});
-
-  final int sentCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final surfaces = context.surfaces;
-    final people = sentCount == 1 ? '1 person' : '$sentCount people';
-    return ColoredBox(
-      color: surfaces.accentSoft,
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-          child: Row(
-            children: [
-              Icon(
-                CupertinoIcons.checkmark_seal_fill,
-                color: surfaces.accent,
-                size: 22,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'You just texted $people, each with their own message. '
-                  'Keep sending with Sent It Pro.',
-                  style: AppText.subhead.copyWith(
-                    color: surfaces.ink,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

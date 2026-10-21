@@ -70,20 +70,20 @@ void main() {
       expect(await service.markFirstGroupCreated(), isFalse);
     });
 
-    test('first send persists and keeps the batch size for the session',
-        () async {
+    test('first send persists and notifies listeners', () async {
       SharedPreferences.setMockInitialValues({});
       final service = OnboardingService.forTesting();
       await service.initialize();
+      var notified = 0;
+      service.addListener(() => notified++);
 
-      await service.markFirstSendCompleted(sentCount: 3);
+      await service.markFirstSendCompleted();
       expect(service.hasCompletedFirstSend, isTrue);
-      expect(service.firstSendCount, 3);
+      expect(notified, 1);
 
       final relaunched = OnboardingService.forTesting();
       await relaunched.initialize();
       expect(relaunched.hasCompletedFirstSend, isTrue);
-      expect(relaunched.firstSendCount, isNull);
     });
   });
 
@@ -113,6 +113,38 @@ void main() {
 
     test('platforms without subscriptions are never gated', () {
       expect(locked(required: false, firstSend: true), isFalse);
+    });
+  });
+
+  group('SubscriptionGate.needsPaywallToSend', () {
+    test('a non-Pro user sees the paywall at Send', () {
+      expect(
+        SubscriptionGate.needsPaywallToSend(
+          subscriptionRequired: true,
+          hasPro: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('Pro and grandfathered users send straight away', () {
+      expect(
+        SubscriptionGate.needsPaywallToSend(
+          subscriptionRequired: true,
+          hasPro: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('platforms without subscriptions never see it', () {
+      expect(
+        SubscriptionGate.needsPaywallToSend(
+          subscriptionRequired: false,
+          hasPro: false,
+        ),
+        isFalse,
+      );
     });
   });
 }

@@ -126,6 +126,14 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
       return;
     }
 
+    AnalyticsService.instance.sendTapped(
+      recipientCount: selectedContacts.length,
+      hasMedia: _selectedMedia.isNotEmpty,
+      isFirstSend: !OnboardingService.instance.hasCompletedFirstSend,
+      hasPro: SubscriptionService.instance.hasPro,
+    );
+
+    if (!await _ensureProForSend() || !mounted) return;
     if (!await _confirmSendLoopOnce() || !mounted) return;
 
     final recipients = List<Contact>.of(selectedContacts);
@@ -282,40 +290,37 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
 
   Future<void> _showResults(SendSummary summary) async {
     final onboarding = OnboardingService.instance;
-    final firstSend = !onboarding.hasCompletedFirstSend;
-    if (firstSend) {
+    if (!onboarding.hasCompletedFirstSend) {
       AnalyticsService.instance.firstSendCompleted(
         sent: summary.sentCount,
         cancelled: summary.skippedCount,
         failed: summary.failedCount,
       );
-    }
-
-    final paywallNext = SubscriptionGate.isLocked(
-      subscriptionRequired: SubscriptionService.isSubscriptionRequired,
-      hasPro: SubscriptionService.instance.hasPro,
-      hasCompletedFirstSend: true,
-    );
-    if (paywallNext) {
-      await onboarding.markFirstSendCompleted(sentCount: summary.sentCount);
+      await onboarding.markFirstSendCompleted();
     }
     if (!mounted) return;
 
-    await showSendResults(
-      context,
-      summary: summary,
-      continueLabel: paywallNext ? 'Keep Sending' : null,
-    );
-
-    if (paywallNext && mounted) {
-      // Back to the root, which the gate now swaps for the paywall.
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      onboarding.presentPaywall();
-    }
+    await showSendResults(context, summary: summary);
   }
 
-  /// Blast sends can't be observed, so they never count as the free first
-  /// send: they need Pro up front.
+  /// Non-Pro users subscribe or start the trial here; closing the paywall
+  /// leaves the message, media and recipients as they were.
+  Future<bool> _ensureProForSend() async {
+    final subscription = SubscriptionService.instance;
+    if (!SubscriptionGate.needsPaywallToSend(
+      subscriptionRequired: SubscriptionService.isSubscriptionRequired,
+      hasPro: subscription.hasPro,
+    )) {
+      return true;
+    }
+
+    AnalyticsService.instance.paywallViewed(PaywallTrigger.send);
+    await RevenueCatUI.presentPaywall(displayCloseButton: true);
+    return subscription.hasPro;
+  }
+
+  /// Blast sends can't be observed, so like any send they need Pro up
+  /// front.
   Future<bool> _ensureProForBlast() async {
     final subscription = SubscriptionService.instance;
     if (subscription.hasPro) return true;

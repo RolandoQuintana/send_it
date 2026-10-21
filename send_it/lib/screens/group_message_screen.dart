@@ -23,7 +23,7 @@ import 'edit_group_screen.dart';
 import 'group_message/composer.dart';
 import 'group_message/send_results_sheet.dart';
 import 'group_message/variable_text_controller.dart';
-import 'more_screen.dart';
+import 'settings_screen.dart';
 
 class GroupMessageScreen extends StatefulWidget {
   final MessageGroup group;
@@ -371,7 +371,7 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
                 Navigator.pop(ctx);
                 Navigator.push(
                   context,
-                  CupertinoPageRoute(builder: (_) => const MoreScreen()),
+                  CupertinoPageRoute(builder: (_) => const SettingsScreen()),
                 );
               },
             ),

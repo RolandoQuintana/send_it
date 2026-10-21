@@ -4,7 +4,7 @@ import 'package:upgrader/upgrader.dart';
 import 'models/message_group.dart';
 import 'screens/create_group_screen.dart';
 import 'screens/group_message_screen.dart';
-import 'screens/more_screen.dart';
+import 'screens/root_tabs.dart';
 import 'screens/welcome_screen.dart';
 import 'services/analytics_service.dart';
 import 'services/appearance_service.dart';
@@ -57,7 +57,7 @@ class SendItApp extends StatelessWidget {
                 debugDisplayAlways: false,
               ),
               dialogStyle: UpgradeDialogStyle.cupertino,
-              child: const HomePage(),
+              child: const RootTabs(),
             ),
           ),
         ),
@@ -139,8 +139,8 @@ class _HomePageState extends State<HomePage> {
     Future<void>? firstGroupSaved;
     MessageGroup? firstGroup;
 
-    await Navigator.push<MessageGroup>(
-      context,
+    // Root navigator: detail screens cover the tab bar.
+    await Navigator.of(context, rootNavigator: true).push<MessageGroup>(
       CupertinoPageRoute(
         builder: (context) => CreateGroupScreen(
           allContacts: allContacts,
@@ -177,8 +177,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _openGroup(MessageGroup group) {
-    Navigator.push(
-      context,
+    Navigator.of(context, rootNavigator: true).push(
       CupertinoPageRoute(
         builder: (context) => GroupMessageScreen(
           group: group,
@@ -210,17 +209,9 @@ class _HomePageState extends State<HomePage> {
         children: [
           CustomScrollView(
             slivers: [
-              CupertinoSliverNavigationBar(
-                largeTitle: const Text('Sent It'),
+              const CupertinoSliverNavigationBar(
+                largeTitle: Text('Sent It'),
                 border: null,
-                trailing: NavIconButton(
-                  icon: CupertinoIcons.ellipsis_circle,
-                  semanticLabel: 'More',
-                  onPressed: () => Navigator.push(
-                    context,
-                    CupertinoPageRoute(builder: (_) => const MoreScreen()),
-                  ),
-                ),
               ),
               if (isLoading)
                 const SliverFillRemaining(

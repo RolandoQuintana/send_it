@@ -6,7 +6,7 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import '../constants/analytics_constants.dart';
 
 /// Where a paywall was shown from, for `paywall_viewed`.
-enum PaywallTrigger { firstSend, launch, blast }
+enum PaywallTrigger { firstSend, launch, blast, settings }
 
 /// Onboarding + paywall funnel events (PostHog).
 ///

@@ -499,10 +499,12 @@ class _SubmitBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 16, 12),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          // Both halves shrink to fit, so the button sits flush right.
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
+              Flexible(
                 child: Text(
                   selectedCount == 1
                       ? '1 contact selected'

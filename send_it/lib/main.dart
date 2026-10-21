@@ -11,6 +11,7 @@ import 'services/appearance_service.dart';
 import 'services/blast_feature_service.dart';
 import 'services/contacts_access_service.dart';
 import 'services/group_storage.dart';
+import 'services/haptics.dart';
 import 'services/onboarding_service.dart';
 import 'services/subscription_service.dart';
 import 'theme/app_surfaces.dart';
@@ -261,7 +262,10 @@ class _HomePageState extends State<HomePage> {
                                     size: 18,
                                     color: surfaces.faint,
                                   ),
-                                  onTap: () => _openGroup(group),
+                                  onTap: () {
+                                    Haptics.selection();
+                                    _openGroup(group);
+                                  },
                                 ),
                             ],
                           ),
@@ -302,7 +306,10 @@ class _NewGroupButton extends StatelessWidget {
       button: true,
       label: 'New group',
       child: GestureDetector(
-        onTap: onPressed,
+        onTap: () {
+          Haptics.primary();
+          onPressed();
+        },
         child: Container(
           width: 60,
           height: 60,

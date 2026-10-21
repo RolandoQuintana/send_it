@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../services/haptics.dart';
 import '../../theme/app_surfaces.dart';
 import '../../theme/app_text.dart';
 
@@ -27,7 +28,12 @@ class PrimaryButton extends StatelessWidget {
     final foreground = enabled ? surfaces.onAccent : surfaces.faint;
 
     final button = CupertinoButton(
-      onPressed: onPressed,
+      onPressed: enabled
+          ? () {
+              Haptics.primary();
+              onPressed!();
+            }
+          : null,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       minimumSize: const Size(64, 50),
       color: enabled ? surfaces.accentFill : surfaces.fill,
@@ -87,6 +93,22 @@ class TextActionButton extends StatelessWidget {
   }
 }
 
+/// The nav bar back chevron, plus a selection haptic. Swipe-back stays
+/// silent, as in iOS.
+class NavBackButton extends StatelessWidget {
+  const NavBackButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoNavigationBarBackButton(
+      onPressed: () {
+        Haptics.selection();
+        Navigator.maybePop(context);
+      },
+    );
+  }
+}
+
 /// Icon-only nav bar button with a 44pt target.
 class NavIconButton extends StatelessWidget {
   const NavIconButton({
@@ -107,7 +129,12 @@ class NavIconButton extends StatelessWidget {
     return CupertinoButton(
       padding: EdgeInsets.zero,
       minimumSize: const Size(44, 44),
-      onPressed: onPressed,
+      onPressed: onPressed == null
+          ? null
+          : () {
+              Haptics.primary();
+              onPressed!();
+            },
       child: Icon(
         icon,
         color: color ?? context.surfaces.accent,

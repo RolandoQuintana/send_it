@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../services/haptics.dart';
 import '../../theme/app_surfaces.dart';
 import '../../theme/app_text.dart';
 import 'avatar.dart';
@@ -123,7 +124,10 @@ class SelectableContactRow extends StatelessWidget {
       subtitle: detail,
       leading: InitialAvatar(name),
       semanticsSelected: selected,
-      onTap: () => onChanged(!selected),
+      onTap: () {
+        Haptics.selection();
+        onChanged(!selected);
+      },
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

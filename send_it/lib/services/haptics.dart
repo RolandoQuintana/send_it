@@ -14,4 +14,9 @@ abstract final class Haptics {
   static void success() {
     if (Platform.isIOS) Gaimon.success();
   }
+
+  /// Something needs attention: a destructive confirm, a blocked action.
+  static void warning() {
+    if (Platform.isIOS) Gaimon.warning();
+  }
 }

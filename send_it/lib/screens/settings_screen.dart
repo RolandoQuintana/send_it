@@ -5,6 +5,7 @@ import '../constants/diagnostic_constants.dart';
 import '../services/analytics_service.dart';
 import '../services/appearance_service.dart';
 import '../services/blast_feature_service.dart';
+import '../services/haptics.dart';
 import '../services/subscription_service.dart';
 import '../services/shortcut_service.dart';
 import '../theme/app_surfaces.dart';
@@ -136,6 +137,7 @@ class _SubscriptionSection extends StatelessWidget {
   final String statusLabel;
 
   Future<void> _upgrade() async {
+    Haptics.primary();
     AnalyticsService.instance.paywallViewed(PaywallTrigger.settings);
     await RevenueCatUI.presentPaywall(displayCloseButton: true);
   }
@@ -205,7 +207,9 @@ class _AppearanceSection extends StatelessWidget {
               ),
           },
           onValueChanged: (mode) {
-            if (mode != null) appearance.setMode(mode);
+            if (mode == null || mode == appearance.mode) return;
+            Haptics.selection();
+            appearance.setMode(mode);
           },
         ),
       ),
@@ -263,7 +267,10 @@ class _BlastHeader extends StatelessWidget {
         CupertinoSwitch(
           value: isEnabled,
           activeTrackColor: surfaces.accentFill,
-          onChanged: onEnabledChanged,
+          onChanged: (value) {
+            Haptics.selection();
+            onEnabledChanged(value);
+          },
         ),
       ],
     );

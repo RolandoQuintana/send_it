@@ -3,6 +3,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 
 import '../services/contact_search_service.dart';
 import '../services/contacts_access_service.dart';
+import '../services/haptics.dart';
 import '../theme/app_surfaces.dart';
 import '../theme/app_text.dart';
 import 'ui/buttons.dart';
@@ -128,6 +129,7 @@ class _GroupFormScreenState extends State<GroupFormScreen>
   Future<void> _submit() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
+      Haptics.warning();
       await showNotice(
         context,
         title: 'Name Your Group',
@@ -136,6 +138,7 @@ class _GroupFormScreenState extends State<GroupFormScreen>
       return;
     }
     if (_selected.isEmpty) {
+      Haptics.warning();
       await showNotice(
         context,
         title: 'Add Members',
@@ -171,7 +174,10 @@ class _GroupFormScreenState extends State<GroupFormScreen>
     final canRead = _access.canRead;
 
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(middle: Text(widget.title)),
+      navigationBar: CupertinoNavigationBar(
+        leading: const NavBackButton(),
+        middle: Text(widget.title),
+      ),
       child: SafeArea(
         bottom: false,
         child: Column(
@@ -444,7 +450,10 @@ class _FilterChip extends StatelessWidget {
       button: true,
       selected: selected,
       child: GestureDetector(
-        onTap: onTap,
+        onTap: () {
+          Haptics.selection();
+          onTap();
+        },
         child: Container(
           constraints: const BoxConstraints(minHeight: 32),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

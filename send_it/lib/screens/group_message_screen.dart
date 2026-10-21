@@ -9,6 +9,7 @@ import '../models/message_group.dart';
 import '../services/analytics_service.dart';
 import '../services/blast_feature_service.dart';
 import '../services/group_storage.dart';
+import '../services/haptics.dart';
 import '../services/onboarding_service.dart';
 import '../services/shortcut_service.dart';
 import '../services/subscription_service.dart';
@@ -580,6 +581,7 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
     return CupertinoPageScaffold(
       resizeToAvoidBottomInset: true,
       navigationBar: CupertinoNavigationBar(
+        leading: const NavBackButton(),
         middle: Text(widget.group.name),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -618,10 +620,13 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
                           trailing: CupertinoButton(
                             padding: EdgeInsets.zero,
                             minimumSize: const Size(44, 28),
-                            onPressed: () => setState(() {
-                              selectedContacts =
-                                  allSelected ? [] : List.from(members);
-                            }),
+                            onPressed: () {
+                              Haptics.selection();
+                              setState(() {
+                                selectedContacts =
+                                    allSelected ? [] : List.from(members);
+                              });
+                            },
                             child: Text(
                               allSelected ? 'Deselect All' : 'Select All',
                               style: AppText.footnote.copyWith(

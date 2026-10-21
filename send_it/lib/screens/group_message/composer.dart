@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 
+import '../../services/haptics.dart';
 import '../../services/shortcut_service.dart';
 import '../../theme/app_surfaces.dart';
 import '../../theme/app_text.dart';
@@ -132,7 +133,10 @@ class _MediaThumb extends StatelessWidget {
               button: true,
               label: 'Remove attachment',
               child: GestureDetector(
-                onTap: onRemove,
+                onTap: () {
+                  Haptics.primary();
+                  onRemove();
+                },
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   // Scrim over a photo, so fixed rather than themed.
@@ -175,7 +179,10 @@ class _RoundIconButton extends StatelessWidget {
     return CupertinoButton(
       padding: EdgeInsets.zero,
       minimumSize: const Size(44, 44),
-      onPressed: onPressed,
+      onPressed: () {
+        Haptics.selection();
+        onPressed();
+      },
       child: Container(
         width: 38,
         height: 38,
@@ -204,7 +211,12 @@ class _SendButton extends StatelessWidget {
       child: CupertinoButton(
         padding: EdgeInsets.zero,
         minimumSize: const Size(44, 44),
-        onPressed: onPressed,
+        onPressed: enabled
+            ? () {
+                Haptics.primary();
+                onPressed!();
+              }
+            : null,
         child: SizedBox(
           width: 44,
           height: 44,
@@ -334,7 +346,10 @@ class _TrayAction extends StatelessWidget {
       label: label,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: onTap,
+        onTap: () {
+          Haptics.primary();
+          onTap();
+        },
         child: ExcludeSemantics(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -399,7 +414,10 @@ class VariablesPanel extends StatelessWidget {
                   CupertinoButton(
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(44, 44),
-                    onPressed: onBack,
+                    onPressed: () {
+                      Haptics.selection();
+                      onBack();
+                    },
                     child: Icon(
                       CupertinoIcons.chevron_back,
                       size: 20,
@@ -461,7 +479,10 @@ class _VariableItem extends StatelessWidget {
       button: true,
       label: 'Insert $description',
       child: GestureDetector(
-        onTap: onTap,
+        onTap: () {
+          Haptics.selection();
+          onTap();
+        },
         child: Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.all(12),
@@ -560,7 +581,10 @@ class PersonalizationBar extends StatelessWidget {
               button: true,
               label: 'Insert first name',
               child: GestureDetector(
-                onTap: onInsertFirstName,
+                onTap: () {
+                  Haptics.selection();
+                  onInsertFirstName();
+                },
                 child: ExcludeSemantics(
                   child: Container(
                     constraints: const BoxConstraints(minHeight: 32),
@@ -615,11 +639,14 @@ class PersonalizationBar extends StatelessWidget {
       label: '$name will get: $preview. Show every message',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => showPersonalizedPreviews(
-          context,
-          message: message,
-          recipients: recipients,
-        ),
+        onTap: () {
+          Haptics.selection();
+          showPersonalizedPreviews(
+            context,
+            message: message,
+            recipients: recipients,
+          );
+        },
         child: ExcludeSemantics(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 0, 4, 8),

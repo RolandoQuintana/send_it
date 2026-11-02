@@ -6,22 +6,46 @@ import UniformTypeIdentifiers
 import MobileCoreServices
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, MFMessageComposeViewControllerDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, MFMessageComposeViewControllerDelegate {
   private var pendingResult: FlutterResult?
   private var temporaryFiles: [URL] = []
 
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-  ) -> Bool {
-    let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
-    let messageChannel = FlutterMethodChannel(name: "com.sendit/messages", binaryMessenger: controller.binaryMessenger)
+  // With the UIScene lifecycle the window (and its FlutterViewController) only
+  // exists once a scene connects, so plugins and channels register here.
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    // flutter_contacts 1.x force-unwraps the app delegate's window while it
+    // registers, and with UIScene that window is nil. A placeholder gets it
+    // through (the app only reads contacts, so it never presents from it),
+    // then goes away before the scene connects: Flutter would otherwise adopt
+    // it as the scene's window. Once the scene is up, the delegate points at
+    // the real window.
+    window = UIWindow(frame: .zero)
+    window?.rootViewController = UIViewController()
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    window = nil
+    NotificationCenter.default.addObserver(
+      forName: UIScene.didActivateNotification, object: nil, queue: .main
+    ) { [weak self] notification in
+      guard let scene = notification.object as? UIWindowScene,
+            let sceneWindow = scene.keyWindow ?? scene.windows.first else { return }
+      self?.window = sceneWindow
+    }
+
+    let messageChannel = FlutterMethodChannel(
+      name: "com.sendit/messages",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
 
     messageChannel.setMethodCallHandler({
       [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
       guard let self = self else { return }
 
       if call.method == "sendMessage" {
+        guard let controller = self.rootViewController else {
+          result(FlutterError(code: "NO_WINDOW", message: "No window to present from", details: nil))
+          return
+        }
+
         print("Received method call: sendMessage")
         print("Raw arguments: \(String(describing: call.arguments))")
         print("Arguments type: \(type(of: call.arguments))")
@@ -185,7 +209,7 @@ import MobileCoreServices
         let fileURL = URL(fileURLWithPath: filePath)
         DispatchQueue.main.async {
           let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
-          if let rootVC = self.window?.rootViewController {
+          if let rootVC = self.rootViewController {
             activityVC.popoverPresentationController?.sourceView = rootVC.view
             activityVC.popoverPresentationController?.sourceRect = rootVC.view.bounds
             rootVC.present(activityVC, animated: true, completion: nil)
@@ -196,9 +220,13 @@ import MobileCoreServices
         result(FlutterMethodNotImplemented)
       }
     })
+  }
 
-    GeneratedPluginRegistrant.register(with: self)
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  /// The root view controller of the app's foreground window scene.
+  private var rootViewController: UIViewController? {
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+    return scene?.keyWindow?.rootViewController ?? scene?.windows.first?.rootViewController
   }
 
   func messageComposeViewController(_ controller: MFMessageComposeViewController, didFinishWith result: MessageComposeResult) {

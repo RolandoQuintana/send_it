@@ -1,4 +1,7 @@
 PODS:
+  - file_picker_darwin (1.0.0):
+    - Flutter
+    - FlutterMacOS
   - Flutter (1.0.0)
   - flutter_contacts (0.0.1):
     - Flutter
@@ -32,6 +35,8 @@ PODS:
   - RevenueCat (5.81.1)
   - RevenueCatUI (5.81.1):
     - RevenueCat (= 5.81.1)
+  - share_plus (0.0.1):
+    - Flutter
   - shared_preferences_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -39,6 +44,7 @@ PODS:
     - Flutter
 
 DEPENDENCIES:
+  - file_picker_darwin (from `.symlinks/plugins/file_picker_darwin/darwin`)
   - Flutter (from `Flutter`)
   - flutter_contacts (from `.symlinks/plugins/flutter_contacts/ios`)
   - gaimon (from `.symlinks/plugins/gaimon/ios`)
@@ -49,6 +55,7 @@ DEPENDENCIES:
   - posthog_flutter (from `.symlinks/plugins/posthog_flutter/darwin`)
   - purchases_flutter (from `.symlinks/plugins/purchases_flutter/ios`)
   - purchases_ui_flutter (from `.symlinks/plugins/purchases_ui_flutter/ios`)
+  - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
 
@@ -61,6 +68,8 @@ SPEC REPOS:
     - RevenueCatUI
 
 EXTERNAL SOURCES:
+  file_picker_darwin:
+    :path: ".symlinks/plugins/file_picker_darwin/darwin"
   Flutter:
     :path: Flutter
   flutter_contacts:
@@ -81,12 +90,15 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/purchases_flutter/ios"
   purchases_ui_flutter:
     :path: ".symlinks/plugins/purchases_ui_flutter/ios"
+  share_plus:
+    :path: ".symlinks/plugins/share_plus/ios"
   shared_preferences_foundation:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
   url_launcher_ios:
     :path: ".symlinks/plugins/url_launcher_ios/ios"
 
 SPEC CHECKSUMS:
+  file_picker_darwin: 4c2b9a50ea44cb3b071381ea0cf48591bdd80251
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_contacts: 5383945387e7ca37cf963d4be57c21f2fc15ca9f
   gaimon: ce0b5c042363ed957bb92ee755c361903d3ce0ef
@@ -102,9 +114,10 @@ SPEC CHECKSUMS:
   PurchasesHybridCommonUI: e6756576ad454c6c15a4679f57446115382ff791
   RevenueCat: 693b033863262f9776130cc6c1f9255a74ab23ff
   RevenueCatUI: 2c7092fa0a485454d2a474e80f241e6db591dd36
+  share_plus: eccd7beb7cea61271aeed1800e8ccb2b952c0c7f
   shared_preferences_foundation: 9e1978ff2562383bd5676f64ec4e9aa8fa06a6f7
   url_launcher_ios: 694010445543906933d732453a59da0a173ae33d
 
-PODFILE CHECKSUM: edc036d218bf620b6c0eb06211ef654d17beb4c1
+PODFILE CHECKSUM: c7e36c9e3811df1cb3764cd0b9c9d3a5c4186ca3
 
-COCOAPODS: 1.16.2
+COCOAPODS: 1.17.0

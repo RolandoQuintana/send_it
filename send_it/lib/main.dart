@@ -85,6 +85,13 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _initialLoad();
+    GroupStorage.revision.addListener(_loadGroups);
+  }
+
+  @override
+  void dispose() {
+    GroupStorage.revision.removeListener(_loadGroups);
+    super.dispose();
   }
 
   /// Never prompts for Contacts here: the group form asks, after explaining

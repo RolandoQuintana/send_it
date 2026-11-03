@@ -1,10 +1,17 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../constants/diagnostic_constants.dart';
 import '../services/analytics_service.dart';
 import '../services/appearance_service.dart';
 import '../services/blast_feature_service.dart';
+import '../services/group_storage.dart';
 import '../services/haptics.dart';
 import '../services/subscription_service.dart';
 import '../services/shortcut_service.dart';
@@ -98,6 +105,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                   const SectionHeader('Appearance'),
                   const _AppearanceSection(),
+                  const SizedBox(height: 28),
+                  const SectionHeader('Backup'),
+                  const _BackupSection(),
                   const SizedBox(height: 28),
                   const SectionHeader('Experimental'),
                   GroupedSection(
@@ -213,6 +223,111 @@ class _AppearanceSection extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+/// Groups live only on this phone, so a backup file is how they move to a
+/// new one: export shares the file (AirDrop, Files, Messages), import reads
+/// it back and matches members to this phone's contacts by number.
+class _BackupSection extends StatelessWidget {
+  const _BackupSection();
+
+  Future<void> _export(BuildContext context) async {
+    Haptics.primary();
+    // The share sheet anchors to the row on iPad.
+    final box = context.findRenderObject() as RenderBox?;
+    final origin =
+        box == null ? null : box.localToGlobal(Offset.zero) & box.size;
+    try {
+      final backup = await GroupStorage.exportBackup();
+      if ((jsonDecode(backup)['groups'] as List).isEmpty) {
+        if (context.mounted) {
+          await showNotice(
+            context,
+            title: 'No Groups Yet',
+            message: 'Create a group first, then export it here.',
+          );
+        }
+        return;
+      }
+      final date = DateTime.now().toIso8601String().substring(0, 10);
+      final file = File(
+          '${(await getTemporaryDirectory()).path}/sent-it-groups-$date.json');
+      await file.writeAsString(backup);
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile(file.path, mimeType: 'application/json')],
+        sharePositionOrigin: origin,
+      ));
+    } catch (e) {
+      if (context.mounted) {
+        await showNotice(context, title: "Couldn't Export", message: '$e');
+      }
+    }
+  }
+
+  Future<void> _import(BuildContext context) async {
+    Haptics.primary();
+    try {
+      final picked = await FilePicker.pickFile();
+      if (picked == null) return;
+      final result = await GroupStorage.importBackup(
+          utf8.decode(await picked.readAsBytes()));
+      if (!context.mounted) return;
+      Haptics.success();
+      final added = result.added == 1 ? '1 group' : '${result.added} groups';
+      await showNotice(
+        context,
+        title: result.added == 0 ? 'Already Imported' : 'Imported $added',
+        message: [
+          if (result.added == 0) 'Every group in this file is already here.',
+          if (result.skipped > 0 && result.added > 0)
+            'Skipped ${result.skipped} already here.',
+          if (result.unmatchedMembers > 0)
+            "${result.unmatchedMembers == 1 ? '1 member isn' : '${result.unmatchedMembers} members aren'}'t "
+                "in this phone's contacts yet. They join their groups once "
+                'their contact is here and Sent It has Contacts access.',
+        ].join('\n\n'),
+      );
+    } on FormatException catch (e) {
+      if (context.mounted) {
+        await showNotice(context, title: "Couldn't Import", message: e.message);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        await showNotice(context, title: "Couldn't Import", message: '$e');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final surfaces = context.surfaces;
+    return GroupedSection(
+      children: [
+        Builder(
+          builder: (rowContext) => TappableRow(
+            title: 'Export Groups',
+            subtitle: 'Save a file to move your groups to a new phone',
+            leading: IconTile(
+              icon: CupertinoIcons.square_arrow_up,
+              color: surfaces.accent,
+              background: surfaces.accentSoft,
+            ),
+            onTap: () => _export(rowContext),
+          ),
+        ),
+        TappableRow(
+          title: 'Import Groups',
+          subtitle: 'Add groups from an exported file',
+          leading: IconTile(
+            icon: CupertinoIcons.square_arrow_down,
+            color: surfaces.accent,
+            background: surfaces.accentSoft,
+          ),
+          onTap: () => _import(context),
+        ),
+      ],
     );
   }
 }

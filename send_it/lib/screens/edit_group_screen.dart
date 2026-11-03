@@ -37,6 +37,7 @@ class EditGroupScreen extends StatelessWidget {
           name: name,
           members: members,
           createdAt: group.createdAt,
+          unmatched: group.unmatched,
         );
         await GroupStorage.updateGroup(updatedGroup);
         onGroupUpdated(updatedGroup);

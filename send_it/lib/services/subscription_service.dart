@@ -6,6 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/subscription_constants.dart';
 
+/// What the App Store receipt says about the user's first install.
+enum ReceiptStatus { grandfathered, notGrandfathered, unresolved }
+
 enum ProAccessSource {
   none,
   entitlement,
@@ -20,10 +23,23 @@ class SubscriptionService extends ChangeNotifier {
 
   static const _grandfatherKey = 'is_grandfathered_paid_buyer';
 
+  /// Set once the legacy local-data check has run on this install, so it
+  /// never runs again (a free user's later groups must not grandfather them).
+  static const legacyCheckDoneKey = 'legacy_data_check_done';
+
+  /// The groups storage key used by the paid 1.2.0 app (see GroupStorage).
+  static const _legacyGroupsKey = 'message_groups';
+
+  static const evaluationTimeout = Duration(seconds: 5);
+
   bool _initialized = false;
   bool _isLoading = true;
   bool _isGrandfathered = false;
   bool _hasActiveEntitlement = false;
+  bool _receiptUnresolved = true;
+  bool _syncAttempted = false;
+  bool _syncSucceeded = false;
+  Future<void>? _syncFuture;
   CustomerInfo? _customerInfo;
   String? _errorMessage;
 
@@ -39,6 +55,21 @@ class SubscriptionService extends ChangeNotifier {
   bool get hasPro {
     if (!isSubscriptionRequired) return true;
     return _hasActiveEntitlement || _isGrandfathered;
+  }
+
+  /// True while we can't tell whether a non-Pro user is a paid-era buyer
+  /// (receipt version missing and nothing found locally). Such users are
+  /// not paywalled; nothing is cached, so it is re-evaluated next launch.
+  /// Deliberately separate from [hasPro].
+  bool get isAccessUnresolved =>
+      isSubscriptionRequired && !hasPro && _receiptUnresolved;
+
+  /// Waits (bounded) for the launch-time receipt sync, so a quick Send tap
+  /// doesn't paywall a paid user. On timeout the state stays unresolved.
+  Future<void> waitForEvaluation({Duration timeout = evaluationTimeout}) async {
+    final pending = _syncFuture;
+    if (pending == null) return;
+    await pending.timeout(timeout, onTimeout: () {});
   }
 
   ProAccessSource get accessSource {
@@ -64,7 +95,10 @@ class SubscriptionService extends ChangeNotifier {
       return;
     }
 
+    // Must run before anything can write `message_groups`; main() awaits
+    // this before runApp.
     await _loadCachedGrandfatherFlag();
+    await _runLegacyDataCheck();
 
     final apiKey = SubscriptionConstants.revenueCatIosApiKey;
     if (apiKey.isEmpty) {
@@ -96,6 +130,33 @@ class SubscriptionService extends ChangeNotifier {
     _isGrandfathered = prefs.getBool(_grandfatherKey) ?? false;
   }
 
+  /// First run on this install only: a `message_groups` key (even an empty
+  /// list) means the paid-era app was used here.
+  Future<void> _runLegacyDataCheck() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (await runLegacyDataCheck(prefs)) _isGrandfathered = true;
+  }
+
+  /// Returns true if the user was grandfathered by this check. Always sets
+  /// the marker so the check never runs twice on an install.
+  @visibleForTesting
+  static Future<bool> runLegacyDataCheck(SharedPreferences prefs) async {
+    final grandfather = shouldGrandfatherFromLegacyData(
+      checkDone: prefs.getBool(legacyCheckDoneKey) ?? false,
+      hasGroupsKey: prefs.containsKey(_legacyGroupsKey),
+    );
+    if (grandfather) await prefs.setBool(_grandfatherKey, true);
+    await prefs.setBool(legacyCheckDoneKey, true);
+    return grandfather;
+  }
+
+  @visibleForTesting
+  static bool shouldGrandfatherFromLegacyData({
+    required bool checkDone,
+    required bool hasGroupsKey,
+  }) =>
+      !checkDone && hasGroupsKey;
+
   Future<void> refreshCustomerInfo() async {
     if (!isSubscriptionRequired) return;
 
@@ -106,6 +167,7 @@ class SubscriptionService extends ChangeNotifier {
     try {
       final info = await Purchases.getCustomerInfo();
       await _applyCustomerInfo(info);
+      _startSyncIfNeeded(info);
     } catch (e) {
       _errorMessage = e.toString();
     } finally {
@@ -113,6 +175,43 @@ class SubscriptionService extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Receipt version is nil until purchases are synced with RevenueCat.
+  /// Syncs once per launch, in the background (not awaited here).
+  void _startSyncIfNeeded(CustomerInfo info) {
+    if (!shouldSyncPurchases(
+      originalVersion: effectiveOriginalVersion(info),
+      isGrandfathered: _isGrandfathered,
+      hasActiveEntitlement: _hasActiveEntitlement,
+      alreadyAttempted: _syncAttempted,
+    )) {
+      return;
+    }
+    _syncAttempted = true;
+    _syncFuture = () async {
+      try {
+        await Purchases.syncPurchases();
+        final synced = await Purchases.getCustomerInfo();
+        _syncSucceeded = true;
+        await _applyCustomerInfo(synced);
+        notifyListeners();
+      } catch (e) {
+        debugPrint('[SubscriptionService] syncPurchases failed: $e');
+      }
+    }();
+  }
+
+  @visibleForTesting
+  static bool shouldSyncPurchases({
+    required String? originalVersion,
+    required bool isGrandfathered,
+    required bool hasActiveEntitlement,
+    required bool alreadyAttempted,
+  }) =>
+      !alreadyAttempted &&
+      !isGrandfathered &&
+      !hasActiveEntitlement &&
+      (originalVersion == null || originalVersion.isEmpty);
 
   Future<void> restorePurchases() async {
     if (!isSubscriptionRequired) return;
@@ -141,7 +240,12 @@ class SubscriptionService extends ChangeNotifier {
     _hasActiveEntitlement =
         info.entitlements.active.containsKey(SubscriptionConstants.entitlementId);
 
-    if (!_isGrandfathered && isGrandfatheredFromReceipt(info)) {
+    final status = resolveReceiptStatus(
+      effectiveOriginalVersion(info),
+      syncSucceeded: _syncSucceeded,
+    );
+    _receiptUnresolved = status == ReceiptStatus.unresolved;
+    if (!_isGrandfathered && status == ReceiptStatus.grandfathered) {
       await _cacheGrandfatherFlag(true);
     }
 
@@ -182,21 +286,43 @@ class SubscriptionService extends ChangeNotifier {
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
 
-  /// Whether the user originally paid for the app before the freemium cutoff.
+  /// The receipt's first-installed build, with the debug override applied.
   @visibleForTesting
-  static bool isGrandfatheredFromReceipt(
-    CustomerInfo info, {
-    int firstFreemiumBuild = SubscriptionConstants.firstFreemiumBuild,
-  }) {
-    // iOS reports the build number of the first install. TestFlight/sandbox
-    // receipts report "1.0", which does not parse, so testers are not
-    // grandfathered.
+  static String? effectiveOriginalVersion(CustomerInfo info) {
     const override = SubscriptionConstants.debugOriginalAppVersion;
-    final version = kDebugMode && override.isNotEmpty
+    return kDebugMode && override.isNotEmpty
         ? override
         : info.originalApplicationVersion;
-    final firstBuild = int.tryParse(version ?? '');
-    return firstBuild != null && firstBuild < firstFreemiumBuild;
+  }
+
+  /// A non-empty version always wins. A missing one is unresolved until a
+  /// sync has succeeded; after that it is a definite "not grandfathered"
+  /// (normal paywall, Restore available). Never cached.
+  @visibleForTesting
+  static ReceiptStatus resolveReceiptStatus(
+    String? version, {
+    required bool syncSucceeded,
+  }) {
+    final status = classifyOriginalVersion(version);
+    if (status == ReceiptStatus.unresolved && syncSucceeded) {
+      return ReceiptStatus.notGrandfathered;
+    }
+    return status;
+  }
+
+  /// iOS reports the build number of the first install. TestFlight/sandbox
+  /// receipts report "1.0", which does not parse, so testers are not
+  /// grandfathered. Null or empty means not synced yet: unresolved.
+  @visibleForTesting
+  static ReceiptStatus classifyOriginalVersion(
+    String? version, {
+    int firstFreemiumBuild = SubscriptionConstants.firstFreemiumBuild,
+  }) {
+    if (version == null || version.isEmpty) return ReceiptStatus.unresolved;
+    final firstBuild = int.tryParse(version);
+    return firstBuild != null && firstBuild < firstFreemiumBuild
+        ? ReceiptStatus.grandfathered
+        : ReceiptStatus.notGrandfathered;
   }
 
   Future<void> _cacheGrandfatherFlag(bool value) async {
@@ -209,5 +335,6 @@ class SubscriptionService extends ChangeNotifier {
   static Future<void> clearLocalStateForTests() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_grandfatherKey);
+    await prefs.remove(legacyCheckDoneKey);
   }
 }

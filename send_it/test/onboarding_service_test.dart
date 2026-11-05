@@ -92,11 +92,13 @@ void main() {
       bool required = true,
       bool hasPro = false,
       bool firstSend = false,
+      bool unresolved = false,
     }) =>
         SubscriptionGate.isLocked(
           subscriptionRequired: required,
           hasPro: hasPro,
           hasCompletedFirstSend: firstSend,
+          accessUnresolved: unresolved,
         );
 
     test('a new non-Pro user gets in to make their first send', () {
@@ -111,6 +113,10 @@ void main() {
       expect(locked(hasPro: true, firstSend: true), isFalse);
     });
 
+    test('unresolved users are never gated', () {
+      expect(locked(firstSend: true, unresolved: true), isFalse);
+    });
+
     test('platforms without subscriptions are never gated', () {
       expect(locked(required: false, firstSend: true), isFalse);
     });
@@ -122,6 +128,7 @@ void main() {
         SubscriptionGate.needsPaywallToSend(
           subscriptionRequired: true,
           hasPro: false,
+          accessUnresolved: false,
         ),
         isTrue,
       );
@@ -132,6 +139,18 @@ void main() {
         SubscriptionGate.needsPaywallToSend(
           subscriptionRequired: true,
           hasPro: true,
+          accessUnresolved: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('an unresolved user is not paywalled at Send', () {
+      expect(
+        SubscriptionGate.needsPaywallToSend(
+          subscriptionRequired: true,
+          hasPro: false,
+          accessUnresolved: true,
         ),
         isFalse,
       );
@@ -142,6 +161,7 @@ void main() {
         SubscriptionGate.needsPaywallToSend(
           subscriptionRequired: false,
           hasPro: false,
+          accessUnresolved: false,
         ),
         isFalse,
       );

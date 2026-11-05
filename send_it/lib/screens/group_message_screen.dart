@@ -308,9 +308,11 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
   /// leaves the message, media and recipients as they were.
   Future<bool> _ensureProForSend() async {
     final subscription = SubscriptionService.instance;
+    await subscription.waitForEvaluation();
     if (!SubscriptionGate.needsPaywallToSend(
       subscriptionRequired: SubscriptionService.isSubscriptionRequired,
       hasPro: subscription.hasPro,
+      accessUnresolved: subscription.isAccessUnresolved,
     )) {
       return true;
     }
@@ -324,7 +326,8 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
   /// front.
   Future<bool> _ensureProForBlast() async {
     final subscription = SubscriptionService.instance;
-    if (subscription.hasPro) return true;
+    await subscription.waitForEvaluation();
+    if (subscription.hasPro || subscription.isAccessUnresolved) return true;
 
     AnalyticsService.instance.paywallViewed(PaywallTrigger.blast);
     await RevenueCatUI.presentPaywall(displayCloseButton: true);

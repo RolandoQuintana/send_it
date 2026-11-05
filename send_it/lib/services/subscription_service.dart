@@ -186,14 +186,17 @@ class SubscriptionService extends ChangeNotifier {
   @visibleForTesting
   static bool isGrandfatheredFromReceipt(
     CustomerInfo info, {
-    DateTime? cutoffUtc,
+    int firstFreemiumBuild = SubscriptionConstants.firstFreemiumBuild,
   }) {
-    final dateStr = info.originalPurchaseDate;
-    if (dateStr == null || dateStr.isEmpty) return false;
-
-    final purchaseDate = DateTime.parse(dateStr).toUtc();
-    final cutoff = cutoffUtc ?? SubscriptionConstants.grandfatherCutoffUtc;
-    return purchaseDate.isBefore(cutoff);
+    // iOS reports the build number of the first install. TestFlight/sandbox
+    // receipts report "1.0", which does not parse, so testers are not
+    // grandfathered.
+    const override = SubscriptionConstants.debugOriginalAppVersion;
+    final version = kDebugMode && override.isNotEmpty
+        ? override
+        : info.originalApplicationVersion;
+    final firstBuild = int.tryParse(version ?? '');
+    return firstBuild != null && firstBuild < firstFreemiumBuild;
   }
 
   Future<void> _cacheGrandfatherFlag(bool value) async {

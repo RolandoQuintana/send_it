@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:send_it/services/subscription_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('isGrandfatheredFromReceipt', () {
@@ -27,27 +28,115 @@ void main() {
       });
     }
 
-    bool check(String? v) => SubscriptionService.isGrandfatheredFromReceipt(
-          buildInfo(originalApplicationVersion: v),
+    ReceiptStatus check(String? v) => SubscriptionService.classifyOriginalVersion(
+          buildInfo(originalApplicationVersion: v).originalApplicationVersion,
         );
 
     test('paid-era builds are grandfathered', () {
-      expect(check('1'), isTrue);
-      expect(check('2'), isTrue);
-      expect(check('4'), isTrue);
+      for (final v in ['1', '4', '6']) {
+        expect(check(v), ReceiptStatus.grandfathered, reason: v);
+      }
     });
 
     test('first freemium build and later are not grandfathered', () {
-      expect(check('7'), isFalse);
-      expect(check('8'), isFalse);
-      expect(check('120'), isFalse);
+      for (final v in ['7', '120']) {
+        expect(check(v), ReceiptStatus.notGrandfathered, reason: v);
+      }
     });
 
-    test('TestFlight placeholder, missing and garbage are not grandfathered',
-        () {
-      expect(check('1.0'), isFalse);
-      expect(check(null), isFalse);
-      expect(check(''), isFalse);
+    test('TestFlight placeholder is not grandfathered', () {
+      expect(check('1.0'), ReceiptStatus.notGrandfathered);
+    });
+
+    test('missing or empty is unresolved', () {
+      expect(check(null), ReceiptStatus.unresolved);
+      expect(check(''), ReceiptStatus.unresolved);
+    });
+  });
+
+  group('resolveReceiptStatus', () {
+    ReceiptStatus r(String? v, bool synced) =>
+        SubscriptionService.resolveReceiptStatus(v, syncSucceeded: synced);
+
+    test('null before sync or after failed sync is unresolved', () {
+      expect(r(null, false), ReceiptStatus.unresolved);
+      expect(r('', false), ReceiptStatus.unresolved);
+    });
+
+    test('null after successful sync is not grandfathered', () {
+      expect(r(null, true), ReceiptStatus.notGrandfathered);
+    });
+
+    test('a non-null value wins regardless of sync state', () {
+      expect(r('2', true), ReceiptStatus.grandfathered);
+      expect(r('2', false), ReceiptStatus.grandfathered);
+      expect(r('7', true), ReceiptStatus.notGrandfathered);
+      expect(r('1.0', false), ReceiptStatus.notGrandfathered);
+    });
+  });
+
+  group('legacy data check', () {
+    Future<(bool, SharedPreferences)> run(Map<String, Object> values) async {
+      SharedPreferences.setMockInitialValues(values);
+      final prefs = await SharedPreferences.getInstance();
+      return (await SubscriptionService.runLegacyDataCheck(prefs), prefs);
+    }
+
+    test('groups key with data grandfathers', () async {
+      final (result, prefs) = await run({
+        'message_groups': <String>['{}'],
+      });
+      expect(result, isTrue);
+      expect(prefs.getBool('is_grandfathered_paid_buyer'), isTrue);
+      expect(prefs.getBool(SubscriptionService.legacyCheckDoneKey), isTrue);
+    });
+
+    test('empty groups list still grandfathers', () async {
+      final (result, _) = await run({'message_groups': <String>[]});
+      expect(result, isTrue);
+    });
+
+    test('absent key does not grandfather but sets the marker', () async {
+      final (result, prefs) = await run({});
+      expect(result, isFalse);
+      expect(prefs.getBool('is_grandfathered_paid_buyer'), isNull);
+      expect(prefs.getBool(SubscriptionService.legacyCheckDoneKey), isTrue);
+    });
+
+    test('marker already set does not grandfather', () async {
+      final (result, prefs) = await run({
+        SubscriptionService.legacyCheckDoneKey: true,
+        'message_groups': <String>['{}'],
+      });
+      expect(result, isFalse);
+      expect(prefs.getBool('is_grandfathered_paid_buyer'), isNull);
+    });
+  });
+
+  group('shouldSyncPurchases', () {
+    bool sync({
+      String? version,
+      bool gf = false,
+      bool pro = false,
+      bool done = false,
+    }) =>
+        SubscriptionService.shouldSyncPurchases(
+          originalVersion: version,
+          isGrandfathered: gf,
+          hasActiveEntitlement: pro,
+          alreadyAttempted: done,
+        );
+
+    test('syncs when the version is missing', () {
+      expect(sync(), isTrue);
+      expect(sync(version: ''), isTrue);
+    });
+
+    test('skips when version present, grandfathered, Pro or already tried', () {
+      expect(sync(version: '1.0'), isFalse);
+      expect(sync(gf: true), isFalse);
+      expect(sync(pro: true), isFalse);
+      expect(sync(done: true), isFalse);
     });
   });
 

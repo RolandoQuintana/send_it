@@ -80,6 +80,6 @@ As a user, I want to subscribe or buy lifetime access so that I can use Sent It 
 
 - RevenueCat MCP was unavailable during implementation — configure dashboard manually
 - API key: `--dart-define=RC_IOS_API_KEY=appl_...`
-- Grandfathering: first-installed build < `SubscriptionConstants.firstFreemiumBuild` (no build flag)
+- Grandfathering: either the receipt's first-installed build < `SubscriptionConstants.firstFreemiumBuild`, or a `message_groups` key present in local storage on the install's first run of this check (receipt missing triggers one `syncPurchases` + `getCustomerInfo`; a successful sync with still-missing value = not grandfathered; unresolved/not paywalled only on fetch or sync failure, re-evaluated next launch)
 - Terms of Use (EULA) still needed before App Review
 - Enable In-App Purchase capability in Xcode before submission

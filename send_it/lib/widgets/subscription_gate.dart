@@ -24,15 +24,20 @@ class SubscriptionGate extends StatefulWidget {
     required bool subscriptionRequired,
     required bool hasPro,
     required bool hasCompletedFirstSend,
+    bool accessUnresolved = false,
   }) =>
-      subscriptionRequired && !hasPro && hasCompletedFirstSend;
+      subscriptionRequired &&
+      !hasPro &&
+      !accessUnresolved &&
+      hasCompletedFirstSend;
 
   /// Whether tapping Send must show the paywall first.
   static bool needsPaywallToSend({
     required bool subscriptionRequired,
     required bool hasPro,
+    required bool accessUnresolved,
   }) =>
-      subscriptionRequired && !hasPro;
+      subscriptionRequired && !hasPro && !accessUnresolved;
 
   @override
   State<SubscriptionGate> createState() => _SubscriptionGateState();
@@ -77,6 +82,7 @@ class _SubscriptionGateState extends State<SubscriptionGate> {
       subscriptionRequired: SubscriptionService.isSubscriptionRequired,
       hasPro: _subscription.hasPro,
       hasCompletedFirstSend: _onboarding.hasCompletedFirstSend,
+      accessUnresolved: _subscription.isAccessUnresolved,
     );
     if (!locked) {
       _loggedPaywallView = false;

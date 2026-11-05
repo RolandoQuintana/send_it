@@ -35,6 +35,8 @@ class SubscriptionConstants {
   /// First build number that shipped as a free download with in-app purchases.
   /// Users whose receipt says they first installed an older build (the paid
   /// era, builds 1-4) are grandfathered. Independent of release timing.
+  /// NEVER let build numbers drop below this in future versions: a new
+  /// install on a lower build would be grandfathered.
   static const firstFreemiumBuild = 7;
 
   /// Debug-only: pretend the receipt's first-installed build is this value.

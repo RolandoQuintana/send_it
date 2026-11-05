@@ -32,14 +32,13 @@ class SubscriptionConstants {
   static String get revenueCatIosApiKey =>
       kReleaseMode ? iosApiKey : iosTestStoreApiKey;
 
-  /// UTC instant when the app price changed to free in App Store Connect.
-  /// Users who originally purchased before this date are grandfathered.
-  /// Set at release: `--dart-define=GRANDFATHER_CUTOFF_ISO=2026-08-01T00:00:00.000Z`
-  static DateTime get grandfatherCutoffUtc {
-    const iso = String.fromEnvironment(
-      'GRANDFATHER_CUTOFF_ISO',
-      defaultValue: '2099-01-01T00:00:00.000Z',
-    );
-    return DateTime.parse(iso).toUtc();
-  }
+  /// First build number that shipped as a free download with in-app purchases.
+  /// Users whose receipt says they first installed an older build (the paid
+  /// era, builds 1-4) are grandfathered. Independent of release timing.
+  static const firstFreemiumBuild = 7;
+
+  /// Debug-only: pretend the receipt's first-installed build is this value.
+  /// Ignored in release builds. `--dart-define=DEBUG_ORIGINAL_APP_VERSION=2`
+  static const debugOriginalAppVersion =
+      String.fromEnvironment('DEBUG_ORIGINAL_APP_VERSION');
 }

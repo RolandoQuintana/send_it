@@ -4,53 +4,50 @@ import 'package:send_it/services/subscription_service.dart';
 
 void main() {
   group('isGrandfatheredFromReceipt', () {
-    final cutoff = DateTime.utc(2026, 8, 1);
+    CustomerInfo buildInfo({String? originalApplicationVersion}) {
+      return CustomerInfo.fromJson({
+        'entitlements': const {
+          'all': <String, dynamic>{},
+          'active': <String, dynamic>{},
+          'verification': 'NOT_REQUESTED',
+        },
+        'activeSubscriptions': const <String>[],
+        'allPurchasedProductIdentifiers': const <String>[],
+        'latestExpirationDate': null,
+        'firstSeen': '2026-01-01T00:00:00Z',
+        'originalAppUserId': 'test-user',
+        'requestDate': '2026-01-01T00:00:00Z',
+        'originalPurchaseDate': null,
+        'originalApplicationVersion': originalApplicationVersion,
+        'managementURL': null,
+        'allExpirationDates': const <String, dynamic>{},
+        'allPurchaseDates': const <String, dynamic>{},
+        'nonSubscriptionTransactions': const <Map<String, dynamic>>[],
+        'subscriptionsByProductIdentifier': const <String, dynamic>{},
+      });
+    }
 
-  CustomerInfo buildInfo({String? originalPurchaseDate}) {
-    return CustomerInfo.fromJson({
-      'entitlements': const {
-        'all': <String, dynamic>{},
-        'active': <String, dynamic>{},
-        'verification': 'NOT_REQUESTED',
-      },
-      'activeSubscriptions': const <String>[],
-      'allPurchasedProductIdentifiers': const <String>[],
-      'latestExpirationDate': null,
-      'firstSeen': '2026-01-01T00:00:00Z',
-      'originalAppUserId': 'test-user',
-      'requestDate': '2026-01-01T00:00:00Z',
-      'originalPurchaseDate': originalPurchaseDate,
-      'originalApplicationVersion': '1',
-      'managementURL': null,
-      'allExpirationDates': const <String, dynamic>{},
-      'allPurchaseDates': const <String, dynamic>{},
-      'nonSubscriptionTransactions': const <Map<String, dynamic>>[],
-      'subscriptionsByProductIdentifier': const <String, dynamic>{},
-    });
-  }
+    bool check(String? v) => SubscriptionService.isGrandfatheredFromReceipt(
+          buildInfo(originalApplicationVersion: v),
+        );
 
-    test('returns true when original purchase is before cutoff', () {
-      final info = buildInfo(originalPurchaseDate: '2026-07-15T12:00:00Z');
-      expect(
-        SubscriptionService.isGrandfatheredFromReceipt(info, cutoffUtc: cutoff),
-        isTrue,
-      );
-    });
-
-    test('returns false when original purchase is on or after cutoff', () {
-      final info = buildInfo(originalPurchaseDate: '2026-08-01T00:00:00Z');
-      expect(
-        SubscriptionService.isGrandfatheredFromReceipt(info, cutoffUtc: cutoff),
-        isFalse,
-      );
+    test('paid-era builds are grandfathered', () {
+      expect(check('1'), isTrue);
+      expect(check('2'), isTrue);
+      expect(check('4'), isTrue);
     });
 
-    test('returns false when original purchase date is missing', () {
-      final info = buildInfo();
-      expect(
-        SubscriptionService.isGrandfatheredFromReceipt(info, cutoffUtc: cutoff),
-        isFalse,
-      );
+    test('first freemium build and later are not grandfathered', () {
+      expect(check('7'), isFalse);
+      expect(check('8'), isFalse);
+      expect(check('120'), isFalse);
+    });
+
+    test('TestFlight placeholder, missing and garbage are not grandfathered',
+        () {
+      expect(check('1.0'), isFalse);
+      expect(check(null), isFalse);
+      expect(check(''), isFalse);
     });
   });
 

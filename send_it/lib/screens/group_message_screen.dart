@@ -55,6 +55,9 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
   bool _showActionButtons = false;
   bool _showVariablesList = false;
 
+  /// The batch in progress is the free first send (`free-first-send` flag).
+  bool _isFreeSend = false;
+
   @override
   void initState() {
     super.initState();
@@ -127,14 +130,20 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
       return;
     }
 
+    final access = await _sendAccess();
+    if (!mounted) return;
     AnalyticsService.instance.sendTapped(
       recipientCount: selectedContacts.length,
       hasMedia: _selectedMedia.isNotEmpty,
       isFirstSend: !OnboardingService.instance.hasCompletedFirstSend,
       hasPro: SubscriptionService.instance.hasPro,
+      freeFirstSend: access.arm,
+      paywallSkipped: access.isFree,
     );
+    _isFreeSend = access.isFree;
 
-    if (!await _ensureProForSend() || !mounted) return;
+    if (access.needsPaywall && !await _presentSendPaywall(access.arm)) return;
+    if (!mounted) return;
     if (!await _confirmSendLoopOnce() || !mounted) return;
 
     final recipients = List<Contact>.of(selectedContacts);
@@ -291,22 +300,40 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
 
   Future<void> _showResults(SendSummary summary) async {
     final onboarding = OnboardingService.instance;
+    final wasFree = _isFreeSend;
+    _isFreeSend = false;
     if (!onboarding.hasCompletedFirstSend) {
       AnalyticsService.instance.firstSendCompleted(
         sent: summary.sentCount,
         cancelled: summary.skippedCount,
         failed: summary.failedCount,
+        wasFree: wasFree,
       );
+      // Exemption first: marking the send notifies the launch gate.
+      if (wasFree) await onboarding.markFreeFirstSendUsed();
       await onboarding.markFirstSendCompleted();
     }
     if (!mounted) return;
 
-    await showSendResults(context, summary: summary);
+    await showSendResults(
+      context,
+      summary: summary,
+      buttonLabel: wasFree ? 'Keep Sending' : 'Done',
+    );
+
+    // Right after the free send: offer Pro once. Closing it keeps the app.
+    if (wasFree && mounted && !SubscriptionService.instance.hasPro) {
+      AnalyticsService.instance
+          .paywallViewed(PaywallTrigger.firstSend, arm: FreeFirstSendArm.on);
+      await RevenueCatUI.presentPaywall(displayCloseButton: true);
+    }
   }
 
-  /// Non-Pro users subscribe or start the trial here; closing the paywall
-  /// leaves the message, media and recipients as they were.
-  Future<bool> _ensureProForSend() async {
+  /// Decides how this Send tap proceeds: straight through (Pro, unresolved
+  /// access, or the free first send) or via the paywall. Reads the
+  /// `free-first-send` flag only when the paywall would otherwise show, so
+  /// Pro users never log a flag exposure.
+  Future<_SendAccess> _sendAccess() async {
     final subscription = SubscriptionService.instance;
     await subscription.waitForEvaluation();
     if (!SubscriptionGate.needsPaywallToSend(
@@ -314,16 +341,29 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
       hasPro: subscription.hasPro,
       accessUnresolved: subscription.isAccessUnresolved,
     )) {
-      return true;
+      return const _SendAccess(needsPaywall: false, isFree: false);
     }
 
-    AnalyticsService.instance.paywallViewed(PaywallTrigger.send);
-    await RevenueCatUI.presentPaywall(displayCloseButton: true);
-    return subscription.hasPro;
+    final arm = await AnalyticsService.instance.freeFirstSendArm();
+    final free = SubscriptionGate.freeFirstSendAllowed(
+      subscriptionRequired: SubscriptionService.isSubscriptionRequired,
+      hasPro: subscription.hasPro,
+      hasCompletedFirstSend: OnboardingService.instance.hasCompletedFirstSend,
+      arm: arm,
+    );
+    return _SendAccess(needsPaywall: !free, isFree: free, arm: arm);
   }
 
-  /// Blast sends can't be observed, so like any send they need Pro up
-  /// front.
+  /// Non-Pro users subscribe or start the trial here; closing the paywall
+  /// leaves the message, media and recipients as they were.
+  Future<bool> _presentSendPaywall(FreeFirstSendArm? arm) async {
+    AnalyticsService.instance.paywallViewed(PaywallTrigger.send, arm: arm);
+    await RevenueCatUI.presentPaywall(displayCloseButton: true);
+    return SubscriptionService.instance.hasPro;
+  }
+
+  /// Blast sends can't be observed, so they never count as the free first
+  /// send: like any send after it, they need Pro up front.
   Future<bool> _ensureProForBlast() async {
     final subscription = SubscriptionService.instance;
     await subscription.waitForEvaluation();
@@ -731,4 +771,22 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
     _textFieldFocusNode.dispose();
     super.dispose();
   }
+}
+
+/// How a Send tap proceeds; see `_sendAccess`.
+class _SendAccess {
+  const _SendAccess({
+    required this.needsPaywall,
+    required this.isFree,
+    this.arm,
+  });
+
+  final bool needsPaywall;
+
+  /// The free first send: no paywall, and the user is exempt from the
+  /// launch gate afterwards.
+  final bool isFree;
+
+  /// The `free-first-send` arm, when the flag was read.
+  final FreeFirstSendArm? arm;
 }

@@ -1,5 +1,7 @@
 # PRD: Free Trial for Sent It Pro
 
+> **SUPERSEDED 2026-11-16:** the 3-day trial was removed. The US intro offer on `sent_it_annual` was given an end date of 2026-11-17 in App Store Connect. Kept for history only.
+>
 > Status: draft (product decisions captured 2026-07-27)
 > Author: Research Agent
 > Date: 2026-07-27

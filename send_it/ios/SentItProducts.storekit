@@ -88,12 +88,7 @@
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "6794926795",
-          "introductoryOffer" : {
-            "internalID" : "6794926901",
-            "numberOfPeriods" : 1,
-            "paymentMode" : "free",
-            "subscriptionPeriod" : "P3D"
-          },
+          "introductoryOffer" : null,
           "localizations" : [
             {
               "description" : "Annual subscription to Sent It Pro.",

@@ -168,7 +168,7 @@ Remote paywall **Sent It Paywall: v1** (`pwa4f358491d9044ab`) on offering `defau
 | Bullets | Dynamic tags; photos/videos/media; unlimited groups & sends; 100% on-device privacy |
 | Default package | Annual (`$rc_annual`) — badge "SAVE 58% • MOST POPULAR" |
 | Secondary packages | Monthly + Lifetime side-by-side below annual |
-| CTA (annual + trial) | Start 3-Day Free Trial & Continue |
+| CTA (annual + trial) | Start 3-Day Free Trial (live copy; no longer shown once the offer ended 2026-11-17) |
 | CTA (fallback) | Unlock Unlimited Messaging |
 | Trust line | 🔒 No risk. Cancel anytime in App Store |
 | Social proof | ★★★★★ "Saved me hours sending event invites!" — Petrus R. |
@@ -177,7 +177,9 @@ Remote paywall **Sent It Paywall: v1** (`pwa4f358491d9044ab`) on offering `defau
 
 **Trial dependency:** CTA trial copy requires a 3-day free intro offer on `sent_it_annual` in ASC. Local simulator testing uses `ios/SentItProducts.storekit` intro offer. Gate: `displayCloseButton: false` in `subscription_gate.dart`.
 
-### Free trial (annual only)
+### Free trial (REMOVED 2026-11-16)
+
+> **The trial is discontinued.** The US intro offer on `sent_it_annual` was given an end date of 2026-11-17 in App Store Connect. No product has a trial after that date. The paywall's trial CTA is conditional on intro-offer eligibility, so it falls back to "Start faster messaging for {{ price }}" on its own. Users already in a trial keep it (`periodType == trial` handling stays in `SubscriptionService`). Everything below is historical.
 
 3-day free **Introductory Offer** on `sent_it_annual` via App Store Connect (`THREE_DAYS` / `FREE_TRIAL`). Monthly and lifetime have **no trial**.
 

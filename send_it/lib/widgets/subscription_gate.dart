@@ -11,6 +11,10 @@ import '../theme/app_text.dart';
 /// [needsPaywallToSend]); this catches anyone who has sent before but lost
 /// Pro: a lapsed trial or subscription, or a free send under an older build.
 ///
+/// With the `free-first-send` flag on, a user's first Send is free
+/// ([freeFirstSendAllowed]) and those users are never locked here: the app
+/// stays usable and every later Send or Blast asks for Pro instead.
+///
 /// Access is determined automatically on launch via [SubscriptionService]:
 /// active `pro` entitlement or grandfathered paid-download receipt.
 /// Restore is available on the paywall if sync fails.
@@ -19,17 +23,33 @@ class SubscriptionGate extends StatefulWidget {
 
   final Widget child;
 
-  /// Whether the paywall replaces the app.
+  /// Whether the paywall replaces the app. Users whose first send was the
+  /// free one are exempt for good.
   static bool isLocked({
     required bool subscriptionRequired,
     required bool hasPro,
     required bool hasCompletedFirstSend,
     bool accessUnresolved = false,
+    bool usedFreeFirstSend = false,
   }) =>
       subscriptionRequired &&
       !hasPro &&
       !accessUnresolved &&
+      !usedFreeFirstSend &&
       hasCompletedFirstSend;
+
+  /// Whether this Send goes out free, skipping the paywall: the user's
+  /// first send, with the `free-first-send` flag on.
+  static bool freeFirstSendAllowed({
+    required bool subscriptionRequired,
+    required bool hasPro,
+    required bool hasCompletedFirstSend,
+    required FreeFirstSendArm arm,
+  }) =>
+      subscriptionRequired &&
+      !hasPro &&
+      !hasCompletedFirstSend &&
+      arm == FreeFirstSendArm.on;
 
   /// Whether tapping Send must show the paywall first.
   static bool needsPaywallToSend({
@@ -83,6 +103,7 @@ class _SubscriptionGateState extends State<SubscriptionGate> {
       hasPro: _subscription.hasPro,
       hasCompletedFirstSend: _onboarding.hasCompletedFirstSend,
       accessUnresolved: _subscription.isAccessUnresolved,
+      usedFreeFirstSend: _onboarding.hasUsedFreeFirstSend,
     );
     if (!locked) {
       _loggedPaywallView = false;

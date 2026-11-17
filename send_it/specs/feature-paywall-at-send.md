@@ -1,5 +1,7 @@
 # Feature: Hard paywall on the first Send tap
 
+> **Update 2026-11-16:** the 3-day annual trial this spec relies on was discontinued (US intro offer ends 2026-11-17). The placement itself is unchanged, but wherever this spec says "start the trial", read "subscribe". The CTA becomes "Start faster messaging for {{ price }}", so the "try it free" argument no longer applies. Revisit the placement decision in `specs/research-hard-paywall-placement.md` with that in mind.
+
 ## Description
 Move the hard paywall from *after* the first send to the moment a non-Pro user taps **Send**. The RevenueCat remote paywall opens as a modal over the composer, so the message, media and recipient selection stay in place. Once the user subscribes or starts the 3-day trial, the send carries on right away. If they close the paywall, they land back in the composer with everything intact.
 
@@ -146,4 +148,5 @@ Run all commands after implementation. All must pass.
 - **Measuring it:** compare weekly cohorts (installs → `send_tapped` → `paywall_viewed{send}` → `purchase_completed`) against the cohorts that shipped with PD-133. A RevenueCat Experiment driven by Offering metadata is possible later, but out of scope here.
 - **Welcome screen price disclosure** ("3 days free, then $X/yr") is recommended by the research to head off any bait-and-switch feeling, but it's **out of scope**. Track it as a separate small issue.
 - **Free recipient cap (fallback option):** out of scope. This feature replaces the free send.
+- **Later:** a free first send came back behind the PostHog flag `free-first-send`, with no cap and no app lock afterwards. See `specs/feature-free-first-send-flag.md` and `app-docs/free-first-send.md`.
 - **Linear:** project P-PD-78 "Decide Hard Paywall Placement".

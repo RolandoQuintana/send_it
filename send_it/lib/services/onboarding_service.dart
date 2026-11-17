@@ -18,8 +18,10 @@ class OnboardingService extends ChangeNotifier {
       'onboarding_has_used_first_message_prefill';
   static const hasCompletedFirstSendKey = 'onboarding_has_completed_first_send';
   static const hasSeenSendExplainerKey = 'onboarding_has_seen_send_explainer';
+  static const hasUsedFreeFirstSendKey = 'free_first_send_used';
 
   bool _initialized = false;
+  bool _hasUsedFreeFirstSend = false;
   bool _hasSeenWelcome = false;
   bool _hasCreatedFirstGroup = false;
   bool _hasUsedFirstMessagePrefill = false;
@@ -30,6 +32,11 @@ class OnboardingService extends ChangeNotifier {
   bool get hasCreatedFirstGroup => _hasCreatedFirstGroup;
   bool get hasUsedFirstMessagePrefill => _hasUsedFirstMessagePrefill;
   bool get hasCompletedFirstSend => _hasCompletedFirstSend;
+
+  /// Whether the first send went out free (the `free-first-send` flag).
+  /// Such users are never locked out by the launch gate; Send and Blast
+  /// still ask for Pro.
+  bool get hasUsedFreeFirstSend => _hasUsedFreeFirstSend;
 
   /// Whether the "one message per person" note has been shown before a send.
   bool get hasSeenSendExplainer => _hasSeenSendExplainer;
@@ -64,8 +71,17 @@ class OnboardingService extends ChangeNotifier {
       _hasSeenSendExplainer = prefs.getBool(hasSeenSendExplainerKey) ?? false;
     }
     _hasCompletedFirstSend = prefs.getBool(hasCompletedFirstSendKey) ?? false;
+    _hasUsedFreeFirstSend = prefs.getBool(hasUsedFreeFirstSendKey) ?? false;
 
     notifyListeners();
+  }
+
+  /// Call before [markFirstSendCompleted]: that notifies the launch gate,
+  /// which must already see the exemption or it would lock the app.
+  Future<void> markFreeFirstSendUsed() async {
+    if (_hasUsedFreeFirstSend) return;
+    _hasUsedFreeFirstSend = true;
+    await _set(hasUsedFreeFirstSendKey);
   }
 
   Future<void> markWelcomeSeen() async {
@@ -98,7 +114,8 @@ class OnboardingService extends ChangeNotifier {
   }
 
   /// Records a batch with at least one sent message. Once set, the launch
-  /// gate locks the app whenever the user isn't Pro (e.g. a lapsed trial).
+  /// gate locks the app whenever the user isn't Pro (e.g. a lapsed trial),
+  /// unless that first send was the free one ([hasUsedFreeFirstSend]).
   Future<void> markFirstSendCompleted() async {
     if (_hasCompletedFirstSend) return;
     _hasCompletedFirstSend = true;

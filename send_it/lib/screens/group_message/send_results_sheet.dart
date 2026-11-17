@@ -43,10 +43,12 @@ class SendSummary {
 Future<void> showSendResults(
   BuildContext context, {
   required SendSummary summary,
+  String buttonLabel = 'Done',
 }) {
   return showCupertinoModalPopup<void>(
     context: context,
-    builder: (_) => SendResultsSheet(summary: summary, buttonLabel: 'Done'),
+    builder: (_) =>
+        SendResultsSheet(summary: summary, buttonLabel: buttonLabel),
   );
 }
 

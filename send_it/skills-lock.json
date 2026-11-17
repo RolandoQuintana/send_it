@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "keyword-research": {
+      "source": "appeeky/aso-skills",
+      "sourceType": "github",
+      "skillPath": "skills/keyword-research/SKILL.md",
+      "computedHash": "16189d57cc4e195b71ddc82445b3a16e8b2f9090669e01fb39e8c8d094f6a06c"
+    }
+  }
+}

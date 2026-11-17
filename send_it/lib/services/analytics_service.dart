@@ -172,6 +172,14 @@ class AnalyticsService {
         {if (productId != null) 'package': productId},
       );
 
+  /// The native rating prompt was requested; iOS may still not show it.
+  void reviewPromptRequested({required int successfulSends}) => _capture(
+        'review_prompt_requested',
+        {'successful_sends': successfulSends},
+      );
+
+  void reviewLinkOpened() => _capture('review_link_opened');
+
   void _capture(String event, [Map<String, Object> properties = const {}]) {
     if (!_enabled) return;
     Posthog().capture(eventName: event, properties: properties);

@@ -13,6 +13,7 @@ import '../services/appearance_service.dart';
 import '../services/blast_feature_service.dart';
 import '../services/group_storage.dart';
 import '../services/haptics.dart';
+import '../services/review_prompt_service.dart';
 import '../services/subscription_service.dart';
 import '../services/shortcut_service.dart';
 import '../theme/app_surfaces.dart';
@@ -108,6 +109,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 28),
                   const SectionHeader('Backup'),
                   const _BackupSection(),
+                  const SizedBox(height: 28),
+                  const SectionHeader('Support'),
+                  const _SupportSection(),
                   const SizedBox(height: 28),
                   const SectionHeader('Experimental'),
                   GroupedSection(
@@ -326,6 +330,30 @@ class _BackupSection extends StatelessWidget {
             background: surfaces.accentSoft,
           ),
           onTap: () => _import(context),
+        ),
+      ],
+    );
+  }
+}
+
+/// Always-available way to rate the app, outside the 3-a-year native prompt.
+class _SupportSection extends StatelessWidget {
+  const _SupportSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final surfaces = context.surfaces;
+    return GroupedSection(
+      children: [
+        TappableRow(
+          title: 'Rate Sent It',
+          subtitle: 'Leave a review on the App Store',
+          leading: IconTile(
+            icon: CupertinoIcons.star,
+            color: surfaces.accent,
+            background: surfaces.accentSoft,
+          ),
+          onTap: ReviewPromptService.instance.openWriteReview,
         ),
       ],
     );

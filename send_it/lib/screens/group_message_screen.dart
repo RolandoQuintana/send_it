@@ -11,6 +11,7 @@ import '../services/blast_feature_service.dart';
 import '../services/group_storage.dart';
 import '../services/haptics.dart';
 import '../services/onboarding_service.dart';
+import '../services/review_prompt_service.dart';
 import '../services/shortcut_service.dart';
 import '../services/subscription_service.dart';
 import '../theme/app_surfaces.dart';
@@ -111,7 +112,11 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
     }
   }
 
+  /// Whether this Send tap went through the paywall; no rating prompt then.
+  bool _paywallShownThisSend = false;
+
   Future<void> _sendMessages() async {
+    _paywallShownThisSend = false;
     if (_messageController.text.isEmpty && _selectedMedia.isEmpty) {
       showNotice(
         context,
@@ -325,8 +330,15 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
     if (wasFree && mounted && !SubscriptionService.instance.hasPro) {
       AnalyticsService.instance
           .paywallViewed(PaywallTrigger.firstSend, arm: FreeFirstSendArm.on);
+      _paywallShownThisSend = true;
       await RevenueCatUI.presentPaywall(displayCloseButton: true);
     }
+
+    await ReviewPromptService.instance.onBatchCompleted(
+      sentCount: summary.sentCount,
+      failedCount: summary.failedCount,
+      paywallShown: _paywallShownThisSend,
+    );
   }
 
   /// Decides how this Send tap proceeds: straight through (Pro, unresolved
@@ -358,6 +370,7 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
   /// leaves the message, media and recipients as they were.
   Future<bool> _presentSendPaywall(FreeFirstSendArm? arm) async {
     AnalyticsService.instance.paywallViewed(PaywallTrigger.send, arm: arm);
+    _paywallShownThisSend = true;
     await RevenueCatUI.presentPaywall(displayCloseButton: true);
     return SubscriptionService.instance.hasPro;
   }

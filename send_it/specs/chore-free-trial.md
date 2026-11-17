@@ -1,5 +1,7 @@
 # Chore: Enable 3-day free trial on Sent It Pro annual subscription
 
+> **SUPERSEDED 2026-11-16:** the trial was removed. The US intro offer on `sent_it_annual` ends 2026-11-17. Kept for history only.
+
 ## Description
 
 Add a **3-day free introductory trial** on the annual subscription (`sent_it_annual`) so new users can try Sent It Pro before committing. This is primarily **App Store Connect + RevenueCat dashboard** work — Apple applies the trial at purchase, RevenueCat grants the `pro` entitlement during the trial, and the existing `SubscriptionService.hasPro` gate already unlocks the app.

@@ -230,23 +230,29 @@ import MobileCoreServices
   }
 
   func messageComposeViewController(_ controller: MFMessageComposeViewController, didFinishWith result: MessageComposeResult) {
-    controller.dismiss(animated: true, completion: nil)
-
-    // Clean up temporary files after the message composer is dismissed
-    cleanupTemporaryFiles()
-
-    // Send the result back to Flutter
-    switch result {
-    case .sent:
-      pendingResult?("sent")
-    case .cancelled:
-      pendingResult?("cancelled")
-    case .failed:
-      pendingResult?(FlutterError(code: "SEND_FAILED", message: "Failed to send message", details: nil))
-    @unknown default:
-      pendingResult?(FlutterError(code: "UNKNOWN_RESULT", message: "Unknown result", details: nil))
-    }
+    // Take the pending result now: a new sendMessage can't arrive until we reply,
+    // but keep the callback local so nothing else can clear it mid-dismiss.
+    let reply = pendingResult
     pendingResult = nil
+
+    // Reply to Flutter only once the sheet is fully gone. Replying while the dismiss
+    // animation is still running made Flutter present the next composer mid-transition,
+    // and iOS then sometimes skipped focusing its body field (keyboard covering Send).
+    controller.dismiss(animated: true) { [weak self] in
+      // Clean up temporary files after the message composer is dismissed
+      self?.cleanupTemporaryFiles()
+
+      switch result {
+      case .sent:
+        reply?("sent")
+      case .cancelled:
+        reply?("cancelled")
+      case .failed:
+        reply?(FlutterError(code: "SEND_FAILED", message: "Failed to send message", details: nil))
+      @unknown default:
+        reply?(FlutterError(code: "UNKNOWN_RESULT", message: "Unknown result", details: nil))
+      }
+    }
   }
 
   private func cleanupTemporaryFiles() {

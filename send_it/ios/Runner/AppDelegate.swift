@@ -80,6 +80,8 @@ import MobileCoreServices
         print("Media Paths: \(String(describing: mediaPaths))")
 
         if MFMessageComposeViewController.canSendText() {
+          // Make sure the app's own keyboard is gone before the composer takes over.
+          controller.view.endEditing(true)
           let messageVC = MFMessageComposeViewController()
           messageVC.messageComposeDelegate = self
           messageVC.recipients = [recipient]

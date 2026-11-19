@@ -151,6 +151,10 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> {
     if (!mounted) return;
     if (!await _confirmSendLoopOnce() || !mounted) return;
 
+    // Drop the message field's focus so no Flutter keyboard is up when the
+    // system composer opens (iOS 27 can leave the composer's Send button under it).
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final recipients = List<Contact>.of(selectedContacts);
     final results = <RecipientResult>[];
     var stopped = false;
